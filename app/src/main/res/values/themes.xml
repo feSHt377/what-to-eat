@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose 应用只需要一个非常简单的系统主题：
+         界面全部由 Compose 绘制，这里只决定窗口背景/状态栏颜色。 -->
+    <style name="Theme.WhatToEat" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFBFF</item>
+        <item name="android:statusBarColor">#FFFBFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
