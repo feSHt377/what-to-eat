@@ -1,15 +1,37 @@
 # 交接文档 · whattoeat（Android 热量/代谢记录 App）
 
 > 生成时间：2026-10-22 23:5x（Asia/Shanghai）
-> 状态一句话：**代码已全部写完（可编译的正确性未验证），还没跑通 build，还没建 git 仓库、没推送。**
+> **更新：2026-10-23 00:0x —— 已在另一台机器上跑通构建、单测，并推送到 GitHub。**
+> 状态一句话：**构建 ✅ 单测 ✅ 推送 ✅；还没装机实测。**
 
 ---
 
 ## 0. 立刻要知道的 3 件事
 
-1. **编译还没成功验证过**。最后一次 `assembleDebug` 被中断，日志停在 `Starting a Gradle Daemon`。大概率能过，但需要第一次真实构建来暴露问题（预期的坑见第 6 节）。
-2. **Gradle Wrapper 已就绪**，`gradle-8.14.3` 分发版已解压到本机缓存，新机器需要重新下载（见第 5 节，国内网络有坑）。
-3. **git 仓库还没初始化**，GitHub 仓库也还没创建。`gh` CLI 已登录账号 `feSHt377`（scopes 含 `repo`），新机器需要重新 `gh auth login`。
+1. **构建已验证通过**：`assembleDebug` 成功（4m41s），`testDebugUnitTest` 21 个用例全绿，APK 11.14 MB。
+2. **代码已推送到 GitHub**：`https://github.com/feSHt377/what-to-eat`（private，分支 `main`，commit `ddcc599`）。**还没做装机实测**，这是唯一的大坑。
+3. **本机（JBR 21）环境要点**：本机没有独立 JDK 17，用的是 Android Studio 自带的 `E:\AndroidStudio\jbr`（JDK 21），构建完全正常。Gradle 8.14.3 分发版需手动从腾讯镜像下载（见第 5.4 节，坑依然存在）。
+
+---
+
+## 0.1 新机器环境速查（2026-10-23 实测可用）
+
+| 项 | 本机路径 / 值 |
+|---|---|
+| JDK | `E:\AndroidStudio\jbr`（JDK 21.0.10，Android Studio 自带）—— 可直接用，无需另装 17 |
+| Android SDK | `C:\Users\feSHt3\AppData\Local\Android\Sdk` |
+| platforms | `android-36`（构建时 AGP 自动装上）+ `android-36.1` |
+| build-tools | `36.0.0`（AGP 另自动装了 `35.0.0`） |
+| 项目路径 | `E:\workspace2\WhatToEat` |
+| git | `C:\Program Files\Git\cmd\git.exe` |
+| GitHub 凭证 | Windows 凭证管理器（`git credential fill` 可取，token 有效，含 `repo` scope） |
+
+⚠️ **PATH 里的 `java` 是 1.8**，直接跑 `gradlew` 会失败。必须先设 `JAVA_HOME`：
+
+```powershell
+$env:JAVA_HOME='E:\AndroidStudio\jbr'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+```
 
 ---
 
@@ -53,10 +75,12 @@
 - **食物模板管理**：新增 / 编辑 / 删除（内置模板也可改可删）
 - 关于卡：版本、存储说明
 
-### 单元测试（`app/src/test/`，尚未运行过）
-- `MetabolismTest`：BMR 手算校验、男女差值 166、体重斜率回归、抗噪、自适应 TDEE 正负号、可信度分档
-- `TdeeEstimatorTest`：三档优先级（手动 > 自适应 > 性别平均值）、数据不足回退、0/负数视为未设置、目标热量安全下限
-- `NutrientsTest`：按克数换算、多条加总、空集合
+### 单元测试（`app/src/test/`）
+- `MetabolismTest`（10 例）：BMR 手算校验、男女差值 166、体重斜率回归、抗噪、自适应 TDEE 正负号、可信度分档
+- `TdeeEstimatorTest`（7 例）：三档优先级（手动 > 自适应 > 性别平均值）、数据不足回退、0/负数视为未设置、目标热量安全下限
+- `NutrientsTest`（4 例）：按克数换算、多条加总、空集合
+
+> ✅ **2026-10-23 实测：21 个用例全部通过，0 失败 0 错误。**
 
 ---
 
@@ -110,8 +134,8 @@ TDEE     = 平均日摄入 − (kg/天 × 7700)
 ## 5. 新机器上继续（照做即可）
 
 ### 5.1 环境准备
-1. JDK 17（推荐 Temurin 17）
-2. Android SDK：`platforms;android-36` + `build-tools;36.0.0`（本机路径 `G:\AndroidSDK`）
+1. JDK 17（推荐 Temurin 17）**或 JDK 21** —— 2026-10-23 实测 JDK 21 构建完全正常，AGP 8.13 不挑
+2. Android SDK：`platforms;android-36` + `build-tools;36.0.0`（新机路径 `C:\Users\feSHt3\AppData\Local\Android\Sdk`）
 3. 复制整个 `WhatToEat` 目录（**不要复制** `.gradle/`、`app/build/`、`build-log.txt`）
 
 ### 5.2 改本机路径
@@ -121,13 +145,19 @@ sdk.dir=D\:\\Your\\AndroidSdk
 ```
 
 ### 5.3 构建
-```bat
-cd <项目目录>
-set JAVA_HOME=C:\Path\To\jdk-17
-gradlew.bat assembleDebug
-gradlew.bat testDebugUnitTest
+
+> ✅ 2026-10-23 在新机器上照此跑通。**PATH 里的 java 是 1.8，必须先设 JAVA_HOME**，否则构建直接挂。
+
+```powershell
+$env:JAVA_HOME='E:\AndroidStudio\jbr'     # 本机路径，按你自己的改
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+cd E:\workspace2\WhatToEat
+.\gradlew.bat assembleDebug
+.\gradlew.bat testDebugUnitTest
 ```
-产物：`app\build\outputs\apk\debug\app-debug.apk`
+产物：`app\build\outputs\apk\debug\app-debug.apk`（11.14 MB）
+
+首次构建 AGP 会**自动下载缺失的 SDK 组件**（本机自动装了 `platforms;android-36` 和 `build-tools;35.0.0`），只要 SDK 目录里有 `licenses/` 且协议已接受就行，不用手动装。
 
 ### 5.4 国内网络两个坑（本机已踩过）
 
@@ -155,34 +185,41 @@ $env:GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 -Dhttps.proxy
 
 **坑 2：Maven 依赖下载。** 若 `dl.google.com` / `repo1.maven.org` 慢，可在 `settings.gradle.kts` 里加阿里云镜像（`maven { url = uri("https://maven.aliyun.com/repository/google") }` 等）。目前配置只有 google() + mavenCentral()，本机实测可达。
 
-### 5.5 建仓库并推送（还没做，账号 `feSHt377`）
-```bat
-cd <项目目录>
-git init
-git add .
-git commit -m "feat: whattoeat v0.1 demo（开屏动画 + 每日记录 + 周期汇总 + 设置/模板管理）"
+### 5.5 建仓库并推送 ✅（已完成，账号 `feSHt377`）
 
-:: GitHub 仓库名不支持空格，"what to eat" 会被规范成 what-to-eat
-gh repo create what-to-eat --private --source . --remote origin --push
-```
-注意：`.gitignore` 已排除 `local.properties`、`.gradle/`、`build/`、`*.apk`，别把它们提交上去。
-`app/schemas/`（Room 导出的表结构 JSON）**建议提交**，以后写数据库迁移要用。
+**已做**（2026-10-23）：
+- `git init -b main` + 首次提交 `ddcc599`（47 个文件）
+- 创建 private 仓库 `https://github.com/feSHt377/what-to-eat`
+- 推送 `main`，本地与远端 SHA 一致
+
+> ⚠️ **`gh` CLI 在本机 token 已失效**（`gh auth status` 报 "token in keyring is invalid"），但 **Windows 凭证管理器里的 token 依然有效**（含 `repo` scope），`git push` 靠它认证。
+> 新机器要推送时，用 `git credential fill` 取 token 即可，不需要 `gh`：
+> ```powershell
+> $tmp="$env:TEMP\cred_in.txt"
+> Set-Content $tmp "protocol=https`r`nhost=github.com`r`n`r`n" -NoNewline -Encoding ascii
+> Get-Content $tmp | & 'C:\Program Files\Git\mingw64\bin\git-credential-manager.exe' get
+> ```
+> 想让 `gh` 也恢复：`gh auth login`（需浏览器交互）或 `gh auth refresh`。
+
+注意：`.gitignore` 已排除 `local.properties`、`.gradle/`、`.kotlin/`、`build/`、`*.apk`，别把它们提交上去（已核验远端 77 个文件，零泄漏）。
+`app/schemas/`（Room 导出的表结构 JSON）**已提交**，以后写数据库迁移要用。
 
 ---
 
 ## 6. 还没做 / 未验证的部分
 
 ### 必须验的
-- [ ] **首次真实构建**（`assembleDebug`）—— 从未成功跑完过一次
-- [ ] **单测**（`testDebugUnitTest`）—— 写了没跑
-- [ ] **装机实测**：开屏动画手感、录一条记录、翻页、删记录、改档案、增删模板
+- [x] ~~**首次真实构建**（`assembleDebug`）~~ → ✅ 2026-10-23 通过，4m41s，0 错误
+- [x] ~~**单测**（`testDebugUnitTest`）~~ → ✅ 2026-10-23 通过，21/21 全绿
+- [ ] **装机实测**（**唯一剩下的大坑**）：开屏动画手感、录一条记录、翻页、删记录、改档案、增删模板、汇总页数字对不对
+      - 本机 `adb devices` 无设备，需插手机或开模拟器：`adb install -r app\build\outputs\apk\debug\app-debug.apk`
 
-### 首次构建可能报错的地方（按概率排序，供快速定位）
-1. **Kotlin/KSP 版本错配**：若报 `ksp-2.2.21-2.0.5 not found` 或 KSP 与 Kotlin 不匹配，去 Maven 确认可用版本号（`com.google.devtools.ksp:symbol-processing-gradle-plugin`），前半段必须等于 Kotlin 版本。
-2. **Material3 API 差异**：`LinearProgressIndicator(progress = { })`（lambda 重载）、`HorizontalDivider`、`FilterChip` 在不同版本签名不同。若报错，改成当前 BOM 对应的签名即可。
-3. **`fallbackToDestructiveMigration(dropAllTables = true)`**：Room 2.7 的新重载；若报没有此方法，改成无参调用（会有一条 deprecation 警告）。
-4. **Compose BOM 与 Kotlin metadata 不兼容**：若报 "class file compiled with a newer Kotlin"，把 BOM 换成更早的 2025.x 版本。
-5. 未使用的 import 只是 warning，不影响构建。
+### 构建已知情况（2026-10-23 实测结论：以下坑一个都没踩到）
+1. ✅ Kotlin 2.2.21 + KSP 2.2.21-2.0.5 组合可用，Room KSP 正常跑通
+2. ✅ Material3 API 签名与 Compose BOM 2025.10.01 匹配，无需改动
+3. ✅ `fallbackToDestructiveMigration(dropAllTables = true)` 在 Room 2.7.2 可用
+4. ✅ Compose BOM 与 Kotlin metadata 无兼容问题
+5. ⚠️ 唯一告警：`MainScreen.kt:86` `TabRow` 已废弃，建议改用 `PrimaryTabRow`/`SecondaryTabRow`（不影响构建，可选）
 
 ### 功能上还没做的
 - [ ] 记录**编辑**（现在只能删了重加）
@@ -234,17 +271,18 @@ app/src/main/java/com/whattoeat/app/
 
 ## 8. 文件清单（哪些要带，哪些不要带）
 
-**要带**：`app/`（不含 `app/build/`）、`gradle/`、`gradlew`、`gradlew.bat`、`settings.gradle.kts`、`build.gradle.kts`、`gradle.properties`、`.gitignore`、`README.md`、`HANDOVER.md`、`local.properties`（复制后改路径）
+**要带**：`app/`（不含 `app/build/`）、`gradle/`、`gradlew`、`gradlew.bat`、`settings.gradle.kts`、`build.gradle.kts`、`gradle.properties`、`.gitignore`、`README.md`、`HANDOVER.md`
 
-**不要带**：`.gradle/`、`app/build/`、`build-log.txt`、`local.properties` 里的旧 sdk 路径
+**不要带**：`.gradle/`、`.kotlin/`、`app/build/`、`build-log.txt`、`local.properties`（本机路径不一样，已 gitignore）
 
 ---
 
 ## 9. 建议的下一步顺序
 
-1. `assembleDebug` 跑通，修掉编译错误（预计 0.5–2 小时）
-2. `testDebugUnitTest` 全绿
-3. 装机实测开屏 + 记一餐 + 汇总页数据是否正确
-4. `git init` + `gh repo create what-to-eat --private` 推送
-5. 做**数据导出/导入**（这是 demo 之后第一个必须补的功能）
-6. 再谈食物库扩充和条码扫描
+1. ✅ `assembleDebug` 跑通（2026-10-23 完成）
+2. ✅ `testDebugUnitTest` 全绿（2026-10-23 完成，21/21）
+3. ✅ `git init` + 建 private 仓库 + 推送（2026-10-23 完成，`feSHt377/what-to-eat`）
+4. ⬜ **装机实测开屏 + 记一餐 + 汇总页数据是否正确**（当前第一优先级，需插设备/开模拟器）
+5. ⬜ 做**数据导出/导入**（demo 之后第一个必须补的功能）
+6. ⬜ 顺手把 `MainScreen.kt` 的废弃 `TabRow` 换成 `PrimaryTabRow`
+7. ⬜ 再谈食物库扩充和条码扫描
