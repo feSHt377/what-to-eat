@@ -484,7 +484,14 @@ private fun AboutCard(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(6.dp))
         LabeledValue("版本", "0.1.0（demo）")
         LabeledValue("数据存储", "仅本机（SQLite），不联网")
+        LabeledValue("许可协议", "PolyForm Noncommercial 1.0.0")
         Spacer(Modifier.height(6.dp))
+        Text(
+            text = "本项目仅授权非商业用途。任何商业使用须先取得作者书面授权。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
         Text(
             text = "热量与营养数值为近似参考值，不构成医疗或营养学建议。",
             style = MaterialTheme.typography.labelSmall,

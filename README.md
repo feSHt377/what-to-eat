@@ -1,8 +1,27 @@
-# whattoeat 🧐😋
+<div align="center">
+  <img src="docs/logo.png" alt="whattoeat logo" width="128" height="128" />
 
-记录每天吃了什么、多少热量，并且**用长期记录反推你真实的每日代谢**的安卓 App。
+  <h1 align="center">whattoeat 🧐😋</h1>
 
-当前是 demo 版（v0.1.0），数据全部保存在本机，不联网、不需要账号。
+  <p align="center">
+    记录每天吃了什么、多少热量，并且<b>用长期记录反推你真实的每日代谢</b>的安卓 App
+  </p>
+
+  <p align="center">
+    <img src="https://img.shields.io/badge/Kotlin-2.2.21-purple?style=flat-square" alt="Kotlin" />
+    <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-00897B?style=flat-square" alt="Compose" />
+    <img src="https://img.shields.io/badge/Room-2.7.2-FFB300?style=flat-square" alt="Room" />
+    <img src="https://img.shields.io/badge/minSdk-26-green?style=flat-square" alt="minSdk" />
+    <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange?style=flat-square" alt="License" />
+  </p>
+</div>
+
+---
+
+当前是 demo 版（v0.1.0），数据全部保存在本机，**不联网、不需要账号、不上传任何数据**。
+
+> ⚠️ **许可协议：PolyForm Noncommercial 1.0.0 —— 仅授权非商业用途。任何商业使用必须先取得作者书面授权。**
+> 详见 [LICENSE](LICENSE)。
 
 ---
 
@@ -34,7 +53,7 @@
 - **个人档案**：性别、身高、体重、出生年份、活动量、目标（减脂 / 维持 / 增肌）
 - **每日代谢 TDEE**：手填优先；留空则自动
 - **食物模板管理**：新增 / 编辑 / 删除（内置模板也能改、能删；改模板不影响历史记录）
-- 关于：版本、数据存储说明
+- 关于：版本、数据存储说明、开源协议
 
 ---
 
@@ -117,6 +136,7 @@ app/src/main/java/com/whattoeat/app/
     └── theme/               配色与主题
 
 app/src/test/java/...        单元测试（不依赖模拟器，秒级跑完）
+tools/gen_icons.py           生成 logo 与各密度应用图标
 ```
 
 ### 重要设计：记录存快照
@@ -129,21 +149,21 @@ app/src/test/java/...        单元测试（不依赖模拟器，秒级跑完）
 ## 五、怎么运行
 
 ### 方式 A：Android Studio（推荐新手）
-1. Android Studio → Open → 选择 `F:\workspace2\WhatToEat` 目录
+1. Android Studio → Open → 选择项目根目录（`WhatToEat`）
 2. 等 Gradle Sync 完成（第一次会下载依赖）
 3. 连真机或开模拟器 → 点绿色 ▶ 运行
 
 ### 方式 B：命令行
 ```bat
-cd F:\workspace2\WhatToEat
-set JAVA_HOME=G:\javas\Java17
+cd E:\workspace2\WhatToEat
+set JAVA_HOME=E:\AndroidStudio\jbr
 gradlew.bat assembleDebug           :: 编译
 gradlew.bat testDebugUnitTest       :: 跑单元测试
 gradlew.bat installDebug            :: 装到已连接的设备
 ```
 产物：`app\build\outputs\apk\debug\app-debug.apk`
 
-> 注意：本机 PATH 里的 `java` 是 1.8，**必须**把 `JAVA_HOME` 指向 JDK 17，否则构建会失败。
+> 注意：本机 PATH 里的 `java` 是 1.8，**必须**把 `JAVA_HOME` 指向 JDK（Android Studio 自带的 `E:\AndroidStudio\jbr` 即 JDK 21，构建正常），否则构建会失败。
 
 ---
 
@@ -160,6 +180,27 @@ gradlew.bat installDebug            :: 装到已连接的设备
 
 ---
 
-## 七、免责声明
+## 七、许可协议（源码可见 / Source Available）
+
+本项目采用 **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)**，全文见 [LICENSE](LICENSE)。
+
+**可以（非商业目的）**
+- 个人学习、研究、实验、私人娱乐、业余爱好项目、宗教活动
+- 慈善组织、教育机构、公共研究机构、公共安全与卫生机构、环保组织、政府机构的使用（不限经费来源）
+- 阅读、修改、创作衍生作品，并向他人分发（须随附本协议条款或其 URL，以及 `Required Notice` 版权行）
+
+**不可以**
+- 任何「以商业优势或金钱报酬为目的」的使用，包括出售、收费服务、企业内部生产经营使用、广告变现、作为商业产品的组成部分
+- 对本协议授权进行再许可（sublicense）或转让
+- 对协议的行使附加额外限制，或移除版权与许可声明
+
+> ⚠️ **术语提醒**：带非商业限制的协议**不属于 OSI 认可的开源协议**，本项目按「源码可见（Source Available）」发布，请勿称其为开源项目。
+
+> 💼 商业使用需另行取得书面授权，请通过 [GitHub Issues](https://github.com/feSHt377/what-to-eat/issues) 联系作者。
+
+---
+
+## 八、免责声明
 
 食物营养数据为公开常识近似值，仅供记录与参考，**不构成医疗或营养学建议**。
+因使用本软件产生的任何数据丢失或健康决策后果，作者不承担责任。

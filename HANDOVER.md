@@ -230,7 +230,7 @@ $env:GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 -Dhttps.proxy
 - [ ] 食物库扩充到 2000+ 条，**生熟状态必须分开**（熟米饭 116 kcal/100g vs 生大米 346）
 - [ ] 账号 / 云同步（Supabase 比 Firebase 省事且国内可用）
 - [ ] 「按当前速度几周能到目标」的预测卡片
-- [ ] 应用图标（现在是个临时矢量图 `res/drawable/ic_launcher.xml`）
+- [x] ~~**应用图标**~~ → ✅ 2026-10-23 已做：`tools/gen_icons.py` 生成 `docs/logo.png` + 各密度 `mipmap-*/ic_launcher(.png|_foreground.png|_round.png)`，自适应图标（`mipmap-anydpi-v26/ic_launcher.xml`）。改设计只需改脚本里的坐标再跑一次。
 
 ---
 
@@ -261,6 +261,9 @@ app/src/main/java/com/whattoeat/app/
     ├── settings/              设置 + 模板管理 + ViewModel
     ├── common/                环形进度、营养条、柱状图、格式化
     └── theme/                 配色（绿色系）+ NutrientColors
+tools/gen_icons.py             生成 docs/logo.png + 各密度 mipmap 图标（改设计就改这个脚本）
+docs/logo.png                  README 顶部展示的 logo
+LICENSE                        PolyForm Noncommercial License 1.0.0 官方全文（仅授权非商业用途，商用需书面授权）
 ```
 
 ### 两个关键设计（改代码前务必理解）
@@ -271,7 +274,7 @@ app/src/main/java/com/whattoeat/app/
 
 ## 8. 文件清单（哪些要带，哪些不要带）
 
-**要带**：`app/`（不含 `app/build/`）、`gradle/`、`gradlew`、`gradlew.bat`、`settings.gradle.kts`、`build.gradle.kts`、`gradle.properties`、`.gitignore`、`README.md`、`HANDOVER.md`
+**要带**：`app/`（不含 `app/build/`）、`gradle/`、`gradlew`、`gradlew.bat`、`settings.gradle.kts`、`build.gradle.kts`、`gradle.properties`、`.gitignore`、`README.md`、`HANDOVER.md`、`LICENSE`、`docs/`、`tools/`
 
 **不要带**：`.gradle/`、`.kotlin/`、`app/build/`、`build-log.txt`、`local.properties`（本机路径不一样，已 gitignore）
 
