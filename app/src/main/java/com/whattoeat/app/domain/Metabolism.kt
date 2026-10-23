@@ -26,6 +26,13 @@ object Metabolism {
     const val AVERAGE_TDEE_MALE = 2250.0
     const val AVERAGE_TDEE_FEMALE = 1800.0
 
+    /**
+     * 每 1000 kcal 摄入建议配多少克膳食纤维。
+     * 参考值：中国居民膳食指南成人 25~30 g/天，美国 DRI 用 14 g / 1000 kcal，
+     * 两者在 2000 kcal 附近基本重合，这里用可以随热量自动缩放的后一种口径。
+     */
+    const val FIBER_G_PER_1000_KCAL = 14.0
+
     fun averageTdee(sex: Sex): Double =
         if (sex == Sex.MALE) AVERAGE_TDEE_MALE else AVERAGE_TDEE_FEMALE
 
@@ -107,26 +114,37 @@ object Metabolism {
 }
 
 /**
- * 每日目标：总热量 + 三大营养素配额。
+ * 每日目标：总热量 + 营养素配额。
  * 分配逻辑（可以按自己需要改）：
- *   - 热量 = TDEE + 目标差值（减脂 -400 / 维持 0 / 增肌 +250），且有安全下限
+ *   - 热量 = TDEE + 每日热量差（默认按目标 −400 / 0 / +250，可在设置里自定义），且有安全下限
  *   - 蛋白 = 体重 × proteinPerKg
  *   - 脂肪 = 总热量的 25%
  *   - 碳水 = 剩下的热量
+ *   - 纤维 = 每 1000 kcal 配 [Metabolism.FIBER_G_PER_1000_KCAL] 克，随热量自动缩放
  */
 data class DailyTargets(
     val kcal: Double,
     val proteinG: Double,
     val fatG: Double,
     val carbG: Double,
+    val fiberG: Double = 0.0,
 ) {
     companion object {
         fun from(profile: UserProfile, tdee: Double): DailyTargets {
-            val kcal = (tdee + profile.goal.dailyDeltaKcal).coerceAtLeast(Metabolism.MIN_SAFE_KCAL)
+            // 注意：用 effectiveDeltaKcal 而不是 goal.dailyDeltaKcal，
+            // 否则自定义的热量差会被悄悄忽略掉。
+            val kcal = (tdee + profile.effectiveDeltaKcal).coerceAtLeast(Metabolism.MIN_SAFE_KCAL)
             val proteinG = profile.weightKg * profile.proteinPerKg
             val fatG = kcal * 0.25 / 9.0
             val carbG = ((kcal - proteinG * 4.0 - fatG * 9.0) / 4.0).coerceAtLeast(0.0)
-            return DailyTargets(kcal = kcal, proteinG = proteinG, fatG = fatG, carbG = carbG)
+            val fiberG = kcal / 1000.0 * Metabolism.FIBER_G_PER_1000_KCAL
+            return DailyTargets(
+                kcal = kcal,
+                proteinG = proteinG,
+                fatG = fatG,
+                carbG = carbG,
+                fiberG = fiberG,
+            )
         }
     }
 }

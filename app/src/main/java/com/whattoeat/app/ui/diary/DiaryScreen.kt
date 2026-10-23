@@ -9,22 +9,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.whattoeat.app.domain.MealType
+import com.whattoeat.app.domain.TdeeEstimator
 import com.whattoeat.app.ui.common.CalorieRing
 import com.whattoeat.app.ui.common.MacroBar
 import com.whattoeat.app.ui.common.SectionCard
 import com.whattoeat.app.ui.common.fmt0
+import com.whattoeat.app.ui.common.fmt1
 import com.whattoeat.app.ui.theme.NutrientColors
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -42,6 +52,8 @@ fun DiaryScreen(
     onToday: () -> Unit,
     onDeleteEntry: (Long) -> Unit,
     onAddToMeal: (MealType) -> Unit,
+    onSaveWeight: (Double) -> Unit,
+    onClearWeight: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -100,7 +112,7 @@ fun DiaryScreen(
             }
         }
 
-        // ---------- 三大营养素 ----------
+        // ---------- 营养素 ----------
         item {
             SectionCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text("营养素", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -110,7 +122,24 @@ fun DiaryScreen(
                 MacroBar("脂肪", state.totals.fatG, state.targets.fatG, NutrientColors.Fat)
                 Spacer(Modifier.height(12.dp))
                 MacroBar("碳水", state.totals.carbG, state.targets.carbG, NutrientColors.Carb)
+                Spacer(Modifier.height(12.dp))
+                MacroBar("膳食纤维", state.totals.fiberG, state.targets.fiberG, NutrientColors.Fiber)
             }
+        }
+
+        // ---------- 当天体重 ----------
+        item {
+            WeightCard(
+                date = state.date,
+                weightKg = state.weightKg,
+                weightLogCount = state.weightLogCount,
+                loggedDayCount = state.loggedDayCount,
+                hasEnoughForTrend = state.hasEnoughWeightForTrend,
+                usingAdaptiveTdee = state.usingAdaptiveTdee,
+                onSave = onSaveWeight,
+                onClear = onClearWeight,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
 
         // ---------- 四个餐次 ----------
@@ -204,6 +233,103 @@ private fun InfoLine(label: String, value: String, highlight: Boolean = false) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = if (highlight) NutrientColors.Over else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * 「当天体重」卡片。
+ *
+ * 体重是反推真实代谢的唯一依据（摄入已知、体重变化已知 ⇒ 消耗可解），
+ * 但之前 App 里压根没有录入入口，所以自适应反推永远是「数据不足」。
+ *
+ * 规则：
+ *  - 这天没记 → 输入框就是空的（不预填档案体重，避免把「没称」记成「称了」）
+ *  - 记了就写进 weight_logs，同一天再记会覆盖
+ *  - 至少要有 2 个体重点才可能算趋势，界面明确提示还差几个
+ */
+@Composable
+private fun WeightCard(
+    date: LocalDate,
+    weightKg: Double?,
+    weightLogCount: Int,
+    loggedDayCount: Int,
+    hasEnoughForTrend: Boolean,
+    usingAdaptiveTdee: Boolean,
+    onSave: (Double) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 日期或已存值变化时重置草稿；null 就是空字符串 = 这天没称
+    var text by remember(date, weightKg) { mutableStateOf(weightKg?.fmt1() ?: "") }
+    val parsed = text.toDoubleOrNull()?.takeIf { it > 0.0 }
+
+    SectionCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("体重", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = if (weightKg != null) "这天已记录" else "这天还没称",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (weightKg != null) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { input ->
+                    text = input.filter { it.isDigit() || it == '.' }
+                },
+                label = { Text("当天体重 kg") },
+                placeholder = { Text("没称就留空") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = { parsed?.let(onSave) },
+                enabled = parsed != null,
+            ) { Text(if (weightKg != null) "覆盖" else "记录") }
+        }
+
+        if (weightKg != null) {
+            TextButton(onClick = onClear) { Text("清除这天体重") }
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = buildString {
+                append("已记录 $weightLogCount 次体重。")
+                when {
+                    !hasEnoughForTrend -> {
+                        val need = DiaryUiState.MIN_WEIGHT_POINTS - weightLogCount
+                        append("还差 $need 次才能算出体重趋势（至少 ${DiaryUiState.MIN_WEIGHT_POINTS} 次）。")
+                    }
+                    usingAdaptiveTdee -> append("当前代谢就是按你的体重趋势反推的。")
+                    loggedDayCount < TdeeEstimator.MIN_LOGGED_DAYS -> {
+                        append("体重够算了，但反推还需要最近 28 天里至少有 ${TdeeEstimator.MIN_LOGGED_DAYS} 天饮食记录")
+                        append("（现在 $loggedDayCount 天）。")
+                    }
+                    else -> append("可以反推代谢了。")
+                }
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (usingAdaptiveTdee) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "体重是反推真实代谢的唯一依据：吃得多少已知、体重怎么变已知，消耗就能解出来。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }

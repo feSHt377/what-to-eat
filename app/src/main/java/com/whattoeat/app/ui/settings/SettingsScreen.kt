@@ -44,6 +44,7 @@ import com.whattoeat.app.ui.common.LabeledValue
 import com.whattoeat.app.ui.common.SectionCard
 import com.whattoeat.app.ui.common.fmt0
 import com.whattoeat.app.ui.common.fmt1
+import com.whattoeat.app.ui.theme.NutrientColors
 
 /**
  * 「设置」页：
@@ -207,6 +208,8 @@ private fun ProfileCard(
     var weightText by remember(profile) { mutableStateOf(profile.weightKg.fmt1()) }
     var yearText by remember(profile) { mutableStateOf(profile.birthYear.toString()) }
     var tdeeText by remember(profile) { mutableStateOf(profile.manualTdeeKcal?.fmt0() ?: "") }
+    // 自定义热量差：留空 = 用所选目标的预设值
+    var deltaText by remember(profile) { mutableStateOf(profile.customDeltaKcal?.fmt0() ?: "") }
 
     SectionCard(modifier = modifier) {
         Text("个人档案", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -286,6 +289,63 @@ private fun ProfileCard(
             }
         }
 
+        // ---- 自定义每日热量差 ----
+        Spacer(Modifier.height(12.dp))
+        Text("每日热量差", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value = deltaText,
+            // 允许负号：缺口就是负数
+            onValueChange = { input ->
+                deltaText = input.filter { it.isDigit() || it == '.' || it == '-' }
+            },
+            label = { Text("留空 = 用目标预设值") },
+            placeholder = { Text("例如 -500，或 300") },
+            prefix = { Text("kcal  ") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        val customDelta = deltaText.trim().toDoubleOrNull()
+        val effectiveDelta = customDelta ?: goal.dailyDeltaKcal
+        val baseTdee = tdeeText.toDoubleOrNull()?.takeIf { it > 0 } ?: autoTdee
+        Text(
+            text = buildString {
+                append("负数 = 缺口（减脂），正数 = 盈余（增肌）。")
+                append("现在生效的是 ")
+                append(if (effectiveDelta > 0) "+" else "")
+                append(effectiveDelta.fmt0())
+                append(" kcal")
+                if (customDelta == null) {
+                    append("（${goal.label}的预设值）")
+                } else {
+                    append("（你自定义的）")
+                }
+                append("。")
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (baseTdee != null) {
+            val targetKcal = (baseTdee + effectiveDelta)
+                .coerceAtLeast(Metabolism.MIN_SAFE_KCAL)
+            val floored = (baseTdee + effectiveDelta) < Metabolism.MIN_SAFE_KCAL
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = buildString {
+                    append("每日目标 ≈ ${targetKcal.fmt0()} kcal（代谢 ${baseTdee.fmt0()} ")
+                    append(if (effectiveDelta >= 0) "+ " else "− ")
+                    append("${kotlin.math.abs(effectiveDelta).fmt0()}）")
+                    if (floored) {
+                        append("；已按安全下限 ${Metabolism.MIN_SAFE_KCAL.fmt0()} kcal 兜底")
+                    }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (floored) NutrientColors.Over else MaterialTheme.colorScheme.primary,
+            )
+        }
+
         // ---- 代谢（TDEE）----
         Spacer(Modifier.height(12.dp))
         Text("每日代谢 TDEE", style = MaterialTheme.typography.labelMedium)
@@ -333,6 +393,7 @@ private fun ProfileCard(
                         weightKg = weightText.toDoubleOrNull() ?: profile.weightKg,
                         birthYear = yearText.toIntOrNull() ?: profile.birthYear,
                         manualTdeeKcal = tdeeText.toDoubleOrNull()?.takeIf { it > 0 },
+                        customDeltaKcal = deltaText.trim().toDoubleOrNull(),
                     )
                 )
             },
@@ -356,7 +417,7 @@ private fun FoodTemplateRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(food.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = "${food.category} · ${food.kcalPer100g.fmt0()} kcal/100g · 蛋白 ${food.proteinPer100g.fmt0()} / 脂 ${food.fatPer100g.fmt0()} / 碳 ${food.carbPer100g.fmt0()}",
+                text = "${food.category} · ${food.kcalPer100g.fmt0()} kcal/100g · 蛋白 ${food.proteinPer100g.fmt0()} / 脂 ${food.fatPer100g.fmt0()} / 碳 ${food.carbPer100g.fmt0()} / 纤维 ${food.fiberPer100g.fmt1()}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -379,6 +440,7 @@ private fun FoodTemplateDialog(
     var proteinText by remember { mutableStateOf(if (initial.proteinPer100g > 0) initial.proteinPer100g.fmt1() else "") }
     var fatText by remember { mutableStateOf(if (initial.fatPer100g > 0) initial.fatPer100g.fmt1() else "") }
     var carbText by remember { mutableStateOf(if (initial.carbPer100g > 0) initial.carbPer100g.fmt1() else "") }
+    var fiberText by remember { mutableStateOf(if (initial.fiberPer100g > 0) initial.fiberPer100g.fmt1() else "") }
     var gramsText by remember { mutableStateOf(initial.defaultGrams.fmt0()) }
 
     val kcal = kcalText.toDoubleOrNull()
@@ -444,6 +506,15 @@ private fun FoodTemplateDialog(
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
+                    value = fiberText,
+                    onValueChange = { fiberText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("膳食纤维 g") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
                     value = gramsText,
                     onValueChange = { gramsText = it.filter { c -> c.isDigit() || c == '.' } },
                     label = { Text("默认一份克数") },
@@ -465,6 +536,7 @@ private fun FoodTemplateDialog(
                                 proteinPer100g = proteinText.toDoubleOrNull() ?: 0.0,
                                 fatPer100g = fatText.toDoubleOrNull() ?: 0.0,
                                 carbPer100g = carbText.toDoubleOrNull() ?: 0.0,
+                                fiberPer100g = fiberText.toDoubleOrNull() ?: 0.0,
                                 defaultGrams = gramsText.toDoubleOrNull()?.takeIf { it > 0 } ?: 100.0,
                             )
                         )

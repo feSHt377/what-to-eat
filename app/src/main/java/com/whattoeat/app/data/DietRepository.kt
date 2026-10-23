@@ -121,7 +121,13 @@ class DietRepository(
      */
     suspend fun addEntry(food: FoodEntity, grams: Double, meal: MealType, date: LocalDate) {
         val nutrients = Nutrients
-            .per100g(food.kcalPer100g, food.proteinPer100g, food.fatPer100g, food.carbPer100g)
+            .per100g(
+                kcal = food.kcalPer100g,
+                proteinG = food.proteinPer100g,
+                fatG = food.fatPer100g,
+                carbG = food.carbPer100g,
+                fiberG = food.fiberPer100g,
+            )
             .scaledTo(grams)
 
         withContext(Dispatchers.IO) {
@@ -136,6 +142,7 @@ class DietRepository(
                     proteinG = nutrients.proteinG,
                     fatG = nutrients.fatG,
                     carbG = nutrients.carbG,
+                    fiberG = nutrients.fiberG,
                 )
             )
         }
@@ -166,6 +173,7 @@ class DietRepository(
                     proteinG = nutrients.proteinG,
                     fatG = nutrients.fatG,
                     carbG = nutrients.carbG,
+                    fiberG = nutrients.fiberG,
                 )
             )
         }
@@ -197,8 +205,27 @@ class DietRepository(
 
     // ==================== 其它 ====================
 
+    /**
+     * 记录某天的体重。
+     *
+     * 除了写进体重历史，如果这条正好是**最新**的体重，
+     * 还会顺手把档案里的体重也更新掉 —— 否则 BMR 和蛋白目标会一直用旧体重算，
+     * 用户会觉得「我明明记了体重，怎么数字没变」。
+     */
     suspend fun saveWeight(date: LocalDate, weightKg: Double) = withContext(Dispatchers.IO) {
         db.weightDao().upsert(WeightLogEntity(date.toString(), weightKg))
+
+        val latest = db.weightDao().latest()
+        if (latest != null && latest.date == date.toString()) {
+            db.profileDao().get()?.let { entity ->
+                db.profileDao().upsert(entity.copy(weightKg = weightKg))
+            }
+        }
+    }
+
+    /** 删除某天的体重记录 */
+    suspend fun deleteWeight(date: LocalDate) = withContext(Dispatchers.IO) {
+        db.weightDao().deleteByDate(date.toString())
     }
 
     suspend fun saveProfile(profile: UserProfile) = withContext(Dispatchers.IO) {
@@ -224,6 +251,7 @@ fun LogEntryEntity.toNutrients(): Nutrients = Nutrients(
     proteinG = proteinG,
     fatG = fatG,
     carbG = carbG,
+    fiberG = fiberG,
 )
 
 /** 模板食物的「每 100 克」营养值 */
@@ -232,6 +260,7 @@ fun FoodEntity.per100gNutrients(): Nutrients = Nutrients(
     proteinG = proteinPer100g,
     fatG = fatPer100g,
     carbG = carbPer100g,
+    fiberG = fiberPer100g,
 )
 
 fun UserProfileEntity.toDomain(): UserProfile = UserProfile(
@@ -242,6 +271,7 @@ fun UserProfileEntity.toDomain(): UserProfile = UserProfile(
     activity = enumOrDefault(activity, ActivityLevel.LIGHT),
     goal = enumOrDefault(goal, Goal.MAINTAIN),
     manualTdeeKcal = manualTdeeKcal,
+    customDeltaKcal = customDeltaKcal,
 )
 
 fun UserProfile.toEntity(): UserProfileEntity = UserProfileEntity(
@@ -252,6 +282,7 @@ fun UserProfile.toEntity(): UserProfileEntity = UserProfileEntity(
     activity = activity.name,
     goal = goal.name,
     manualTdeeKcal = manualTdeeKcal,
+    customDeltaKcal = customDeltaKcal,
 )
 
 /** 字符串解析失败时回退到默认值，避免数据库脏数据把 App 搞崩 */

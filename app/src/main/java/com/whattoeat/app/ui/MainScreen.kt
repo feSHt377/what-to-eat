@@ -141,6 +141,8 @@ fun MainScreen(
                         pendingMeal = meal
                         showAddScreen = true
                     },
+                    onSaveWeight = diaryViewModel::saveWeight,
+                    onClearWeight = diaryViewModel::clearWeight,
                     contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
 

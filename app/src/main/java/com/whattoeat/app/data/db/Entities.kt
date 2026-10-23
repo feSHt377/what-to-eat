@@ -17,6 +17,8 @@ data class FoodEntity(
     val proteinPer100g: Double,
     val fatPer100g: Double,
     val carbPer100g: Double,
+    /** 膳食纤维（每 100 克）。没有数据时填 0，不要瞎猜 */
+    val fiberPer100g: Double = 0.0,
     /** 默认一份多少克，添加快捷一点 */
     val defaultGrams: Double = 100.0,
     val builtIn: Boolean = true,
@@ -43,10 +45,12 @@ data class LogEntryEntity(
     val proteinG: Double,
     val fatG: Double,
     val carbG: Double,
+    /** 膳食纤维（快照） */
+    val fiberG: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
-/** 体重记录：一天一条（同一天再记会覆盖） */
+/** 体重记录：一天一条（同一天再记会覆盖）。没记录的日子就没有行，就是「空」 */
 @Entity(tableName = "weight_logs")
 data class WeightLogEntity(
     @PrimaryKey val date: String,
@@ -65,6 +69,8 @@ data class UserProfileEntity(
     val goal: String,
     /** 设置页手动填写的每日代谢；null 表示"自动" */
     val manualTdeeKcal: Double? = null,
+    /** 自定义每日热量差；null 表示"用目标预设值" */
+    val customDeltaKcal: Double? = null,
 ) {
     companion object {
         const val SINGLETON_ID = 1

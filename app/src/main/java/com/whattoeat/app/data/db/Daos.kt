@@ -61,9 +61,16 @@ interface WeightDao {
     @Query("SELECT * FROM weight_logs ORDER BY date ASC")
     fun all(): Flow<List<WeightLogEntity>>
 
+    /** 更新成最近的一条体重，用于同步档案里的体重 */
+    @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT 1")
+    suspend fun latest(): WeightLogEntity?
+
     /** 同一天重复记录直接覆盖 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(log: WeightLogEntity)
+
+    @Query("DELETE FROM weight_logs WHERE date = :date")
+    suspend fun deleteByDate(date: String)
 }
 
 @Dao

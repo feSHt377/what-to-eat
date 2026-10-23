@@ -219,9 +219,11 @@ fun SummaryScreen(
                 MacroBar("脂肪", state.avgFat, state.targets.fatG, NutrientColors.Fat)
                 Spacer(Modifier.height(10.dp))
                 MacroBar("碳水", state.avgCarb, state.targets.carbG, NutrientColors.Carb)
+                Spacer(Modifier.height(10.dp))
+                MacroBar("膳食纤维", state.avgFiber, state.targets.fiberG, NutrientColors.Fiber)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "进度条 = 日均摄入 / 每日目标。",
+                    text = "进度条 = 日均摄入 / 每日目标。纤维目标按每 1000 kcal 配 14 g 折算。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

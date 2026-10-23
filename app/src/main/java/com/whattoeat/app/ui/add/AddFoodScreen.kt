@@ -49,6 +49,7 @@ import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.domain.Nutrients
 import com.whattoeat.app.ui.common.fmt0
+import com.whattoeat.app.ui.common.fmt1
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -212,13 +213,19 @@ fun AddFoodScreen(
         CustomEntryDialog(
             mealLabel = meal.label,
             onDismiss = { showCustomDialog = false },
-            onConfirm = { name, kcal, protein, fat, carb ->
+            onConfirm = { name, kcal, protein, fat, carb, fiber ->
                 scope.launch {
                     repository.addCustomEntry(
                         date = date,
                         meal = meal,
                         name = name,
-                        nutrients = Nutrients(kcal = kcal, proteinG = protein, fatG = fat, carbG = carb),
+                        nutrients = Nutrients(
+                            kcal = kcal,
+                            proteinG = protein,
+                            fatG = fat,
+                            carbG = carb,
+                            fiberG = fiber,
+                        ),
                     )
                     showCustomDialog = false
                 }
@@ -239,7 +246,7 @@ private fun FoodRow(food: FoodEntity, onClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(food.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = "${food.category} · 默认 ${food.defaultGrams.fmt0()} g",
+                text = "${food.category} · 默认 ${food.defaultGrams.fmt0()} g · 纤维 ${food.fiberPer100g.fmt1()} g",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -304,19 +311,28 @@ private fun GramDialog(
 
 /**
  * 自定义记录弹窗。
- * 只有「名称 + 热量」是必填，三大营养素可以不填（很多人根本不知道自己吃了多少蛋白）。
+ * 只有「名称 + 热量」是必填，营养素（含膳食纤维）都可以不填
+ * —— 很多人根本不知道自己吃了多少蛋白。
  */
 @Composable
 private fun CustomEntryDialog(
     mealLabel: String,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, kcal: Double, protein: Double, fat: Double, carb: Double) -> Unit,
+    onConfirm: (
+        name: String,
+        kcal: Double,
+        protein: Double,
+        fat: Double,
+        carb: Double,
+        fiber: Double,
+    ) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var kcalText by remember { mutableStateOf("") }
     var proteinText by remember { mutableStateOf("") }
     var fatText by remember { mutableStateOf("") }
     var carbText by remember { mutableStateOf("") }
+    var fiberText by remember { mutableStateOf("") }
 
     val kcal = kcalText.toDoubleOrNull()
     val canConfirm = name.isNotBlank() && kcal != null && kcal > 0
@@ -344,7 +360,7 @@ private fun CustomEntryDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "下面三项可以留空",
+                    text = "下面四项可以留空",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -377,6 +393,15 @@ private fun CustomEntryDialog(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = fiberText,
+                    onValueChange = { fiberText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("膳食纤维 g") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
@@ -389,6 +414,7 @@ private fun CustomEntryDialog(
                             proteinText.toDoubleOrNull() ?: 0.0,
                             fatText.toDoubleOrNull() ?: 0.0,
                             carbText.toDoubleOrNull() ?: 0.0,
+                            fiberText.toDoubleOrNull() ?: 0.0,
                         )
                     }
                 },

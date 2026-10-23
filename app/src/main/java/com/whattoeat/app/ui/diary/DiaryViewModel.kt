@@ -12,8 +12,8 @@ import com.whattoeat.app.domain.DailyTargets
 import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.domain.Nutrients
 import com.whattoeat.app.domain.TdeeEstimator
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,14 +37,28 @@ data class DiaryUiState(
     val targets: DailyTargets = DailyTargets(2000.0, 120.0, 55.0, 220.0),
     val tdee: Double = 2000.0,
     val usingAdaptiveTdee: Boolean = false,
+    /** 当前日期已经记录的体重；null = 这天没称，输入框就是空的 */
+    val weightKg: Double? = null,
+    /** 一共记录过多少次体重。少于 2 次就没法算趋势，界面要提示 */
+    val weightLogCount: Int = 0,
+    /** 最近 28 天里有几天记了饮食。反推代谢还要求这个够数 */
+    val loggedDayCount: Int = 0,
 ) {
     val isOverKcal: Boolean get() = totals.kcal > targets.kcal
     val remainingKcal: Double get() = targets.kcal - totals.kcal
+
+    /** 体重够不够两次 —— 不够的话代谢只能退回公式/平均值 */
+    val hasEnoughWeightForTrend: Boolean get() = weightLogCount >= MIN_WEIGHT_POINTS
 
     fun entriesOf(meal: MealType): List<LogEntryEntity> = entries.filter { it.meal == meal.name }
 
     fun subtotalOf(meal: MealType): Nutrients =
         Nutrients.sum(entriesOf(meal).map { it.toNutrients() })
+
+    companion object {
+        /** 算体重趋势的最低要求：至少两个点才能连成线 */
+        const val MIN_WEIGHT_POINTS = 2
+    }
 }
 
 /**
@@ -98,6 +112,10 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
             targets = DailyTargets.from(profile, estimate.effectiveTdee),
             tdee = estimate.effectiveTdee,
             usingAdaptiveTdee = estimate.usingAdaptive,
+            // 只取「当前这一天」的体重：没记录就是 null，界面上显示空输入框
+            weightKg = weights.firstOrNull { it.date == date.toString() }?.weightKg,
+            weightLogCount = weights.size,
+            loggedDayCount = dailyKcal.size,
         )
     }
         .flowOn(Dispatchers.Default)
@@ -113,6 +131,22 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
 
     fun goToday() {
         _date.value = LocalDate.now()
+    }
+
+    /**
+     * 记录当前查看日期的体重。
+     * 同一天重复记会覆盖（数据库里 date 是主键），符合「一天一个数」的直觉。
+     */
+    fun saveWeight(weightKg: Double) {
+        if (weightKg <= 0.0) return
+        val targetDate = _date.value
+        viewModelScope.launch { repository.saveWeight(targetDate, weightKg) }
+    }
+
+    /** 删除当前日期的体重记录（用户点错时用） */
+    fun clearWeight() {
+        val targetDate = _date.value
+        viewModelScope.launch { repository.deleteWeight(targetDate) }
     }
 
     fun deleteEntry(id: Long) {

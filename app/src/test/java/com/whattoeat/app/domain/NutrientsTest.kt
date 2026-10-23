@@ -1,6 +1,7 @@
 package com.whattoeat.app.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NutrientsTest {
@@ -37,5 +38,34 @@ class NutrientsTest {
     fun `零克数结果为零`() {
         val rice = Nutrients.per100g(116.0, 2.6, 0.3, 25.9)
         assertEquals(0.0, rice.scaledTo(0.0).kcal, 0.001)
+    }
+
+    @Test
+    fun `膳食纤维也按克数换算`() {
+        // 燕麦片每 100 克含 10.6 g 纤维，吃 40 克 = 4.24 g
+        val oats = Nutrients.per100g(
+            kcal = 377.0,
+            proteinG = 15.0,
+            fatG = 6.7,
+            carbG = 61.0,
+            fiberG = 10.6,
+        )
+        assertEquals(4.24, oats.scaledTo(40.0).fiberG, 0.001)
+        // 热量换算不受纤维影响
+        assertEquals(150.8, oats.scaledTo(40.0).kcal, 0.01)
+    }
+
+    @Test
+    fun `膳食纤维可以加总`() {
+        val a = Nutrients(kcal = 100.0, fiberG = 2.5)
+        val b = Nutrients(kcal = 200.0, fiberG = 3.5)
+        assertEquals(6.0, Nutrients.sum(listOf(a, b)).fiberG, 0.001)
+    }
+
+    @Test
+    fun `只有纤维没有热量也不算空`() {
+        // 纯纤维补充剂：0 kcal 但有纤维，不应被当成「空记录」
+        assertTrue(Nutrients(fiberG = 5.0).isEmpty().not())
+        assertTrue(Nutrients.ZERO.isEmpty())
     }
 }

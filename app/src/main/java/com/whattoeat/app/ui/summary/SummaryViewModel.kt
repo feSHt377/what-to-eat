@@ -42,6 +42,7 @@ data class SummaryUiState(
     val avgProtein: Double = 0.0,
     val avgFat: Double = 0.0,
     val avgCarb: Double = 0.0,
+    val avgFiber: Double = 0.0,
     val onTargetDays: Int = 0,
     val cumulativeBalance: Double = 0.0,
     val estimate: TdeeEstimate? = null,
@@ -113,6 +114,7 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
                     list.sumOf { it.proteinG },
                     list.sumOf { it.fatG },
                     list.sumOf { it.carbG },
+                    list.sumOf { it.fiberG },
                 )
             }
 
@@ -150,6 +152,9 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
         val avgCarb = if (loggedDays > 0) {
             loggedPoints.sumOf { nutrientsByDate[it.date]?.get(2) ?: 0.0 } / loggedDays
         } else 0.0
+        val avgFiber = if (loggedDays > 0) {
+            loggedPoints.sumOf { nutrientsByDate[it.date]?.get(3) ?: 0.0 } / loggedDays
+        } else 0.0
 
         val cumulativeBalance = loggedPoints.sumOf { it.kcal - targets.kcal }
         val onTargetDays = loggedPoints.count { it.inTarget }
@@ -172,6 +177,7 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
             avgProtein = avgProtein,
             avgFat = avgFat,
             avgCarb = avgCarb,
+            avgFiber = avgFiber,
             onTargetDays = onTargetDays,
             cumulativeBalance = cumulativeBalance,
             estimate = estimate,

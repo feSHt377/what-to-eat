@@ -34,11 +34,13 @@ private val DarkColors = darkColorScheme(
     surfaceVariant = Color(0xFF41493F),
 )
 
-/** 三大营养素固定配色，全 App 统一，形成"肌肉记忆" */
+/** 三大营养素 + 纤维的固定配色，全 App 统一，形成"肌肉记忆" */
 object NutrientColors {
     val Protein = Color(0xFF3C6E9F)
     val Fat = Color(0xFFC98A3B)
     val Carb = Color(0xFF7A5AA8)
+    /** 膳食纤维：绿色系，和「蔬菜」的直觉一致 */
+    val Fiber = Color(0xFF3F8F5B)
     val Over = Color(0xFFB3261E) // 超量时用红色
 }
 

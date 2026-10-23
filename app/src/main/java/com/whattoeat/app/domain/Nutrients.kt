@@ -13,6 +13,8 @@ data class Nutrients(
     val proteinG: Double = 0.0,
     val fatG: Double = 0.0,
     val carbG: Double = 0.0,
+    /** 膳食纤维（g）。不提供热量，但和饱腹感、肠道健康关系很大，单列一项 */
+    val fiberG: Double = 0.0,
 ) {
     /** 加总：两餐的营养素相加 */
     operator fun plus(other: Nutrients): Nutrients = Nutrients(
@@ -20,6 +22,7 @@ data class Nutrients(
         proteinG = proteinG + other.proteinG,
         fatG = fatG + other.fatG,
         carbG = carbG + other.carbG,
+        fiberG = fiberG + other.fiberG,
     )
 
     /** 乘一个倍数（比如吃 1.5 份） */
@@ -28,6 +31,7 @@ data class Nutrients(
         proteinG = proteinG * factor,
         fatG = fatG * factor,
         carbG = carbG * factor,
+        fiberG = fiberG * factor,
     )
 
     /**
@@ -35,14 +39,20 @@ data class Nutrients(
      */
     fun scaledTo(grams: Double): Nutrients = this * (grams / 100.0)
 
-    fun isEmpty(): Boolean = kcal <= 0.0 && proteinG <= 0.0 && fatG <= 0.0 && carbG <= 0.0
+    fun isEmpty(): Boolean =
+        kcal <= 0.0 && proteinG <= 0.0 && fatG <= 0.0 && carbG <= 0.0 && fiberG <= 0.0
 
     companion object {
         val ZERO = Nutrients()
 
         /** 构造一个「每 100 克含多少」的营养值，纯粹为了可读性 */
-        fun per100g(kcal: Double, proteinG: Double, fatG: Double, carbG: Double): Nutrients =
-            Nutrients(kcal, proteinG, fatG, carbG)
+        fun per100g(
+            kcal: Double,
+            proteinG: Double,
+            fatG: Double,
+            carbG: Double,
+            fiberG: Double = 0.0,
+        ): Nutrients = Nutrients(kcal, proteinG, fatG, carbG, fiberG)
 
         /** 把一堆营养素加起来 */
         fun sum(items: Iterable<Nutrients>): Nutrients = items.fold(ZERO) { acc, n -> acc + n }

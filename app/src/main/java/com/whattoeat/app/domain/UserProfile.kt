@@ -44,6 +44,23 @@ data class UserProfile(
      * 只要这里填了数字，就无条件优先使用它（用户说了算）。
      */
     val manualTdeeKcal: Double? = null,
+    /**
+     * 自定义每日热量差（正数 = 盈余，负数 = 缺口），单位 kcal。
+     * null = 用 [goal] 的预设值（减脂 −400 / 维持 0 / 增肌 +250）。
+     *
+     * 想减得更快（比如 −600）或更慢（比如 −250）时填这个，
+     * 它会覆盖掉所选目标的预设差值。
+     */
+    val customDeltaKcal: Double? = null,
 ) {
     val age: Int get() = (LocalDate.now().year - birthYear).coerceAtLeast(1)
+
+    /**
+     * 最终生效的每日热量差：填了自定义值就用它，否则用目标预设值。
+     * 所有算目标热量的地方都必须走这里，别直接读 [goal]。
+     */
+    val effectiveDeltaKcal: Double get() = customDeltaKcal ?: goal.dailyDeltaKcal
+
+    /** 是否在用自定义差值（界面用来切换「预设 / 自定义」的提示） */
+    val usingCustomDelta: Boolean get() = customDeltaKcal != null
 }
