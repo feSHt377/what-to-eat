@@ -12,11 +12,13 @@ import com.whattoeat.app.domain.DailyTargets
 import com.whattoeat.app.domain.TdeeEstimate
 import com.whattoeat.app.domain.TdeeEstimator
 import com.whattoeat.app.domain.UserProfile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 
@@ -65,19 +67,28 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
     private val _periodDays = MutableStateFlow(7)
     val periodDays: StateFlow<Int> = _periodDays.asStateFlow()
 
+    /**
+     * 汇总页状态。
+     *
+     *  - `flowOn(Dispatchers.Default)`：把「按天分组求和 + 体重回归 + TDEE」挪出主线程。
+     *  - `SharingStarted.Eagerly`：ViewModel 一创建就开始算，开屏动画期间就能备好，
+     *    玩家第一次点「汇总」直接看到数据。
+     */
     val uiState: StateFlow<SummaryUiState> = combine(
-        repository.profile(),
-        repository.weights(),
+        repository.profile,
+        repository.weights,
         // 一次拿满 28 天，切换周期时不重新查库
         repository.entriesBetween(today.minusDays(TdeeEstimator.WINDOW_DAYS - 1), today),
         _periodDays,
     ) { profile, weights, entries, period ->
         buildState(profile, weights, entries, period)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = SummaryUiState(),
-    )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = SummaryUiState(),
+        )
 
     fun setPeriod(days: Int) {
         _periodDays.value = days

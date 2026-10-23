@@ -1,5 +1,6 @@
 package com.whattoeat.app.ui.add
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,12 +18,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +60,7 @@ import java.time.LocalDate
  *
  * 写入后停留在列表页，方便连续加几样。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodScreen(
     repository: DietRepository,
@@ -67,92 +76,118 @@ fun AddFoodScreen(
     var showCustomDialog by remember { mutableStateOf(false) }
 
     val meal = MealType.fromName(mealName)
-    val foodFlow = remember(query) { repository.searchFoods(query) }
-    val foods by foodFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // 搜索走「查询词作为流」的接口：Repository 那边自带 distinctUntilChanged + 防抖，
+    // 所以每敲一个字不会立刻打一次库，停下来 150ms 才查。
+    // 页面刚打开时（空查询）不防抖，立刻出结果，不让用户干等。
+    val queryFlow = remember { snapshotFlow { query } }
+    val foods by repository.searchFoods(queryFlow).collectAsStateWithLifecycle(initialValue = emptyList())
 
-        // ---------- 顶部栏 ----------
-        Row(
+    // 系统返回键 = 关闭这个全屏页，回到原来的 Tab
+    BackHandler(onBack = onDismiss)
+
+    Scaffold(
+        topBar = {
+            // TopAppBar 会自动把状态栏高度让出来，所以「取消」不会被状态栏盖住点不到
+            // （targetSdk 36 强制全面屏，这是必须处理的）。
+            TopAppBar(
+                title = { Text("添加食物") },
+                navigationIcon = {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
+        },
+        bottomBar = {
+            // 「完成」放到最下面：原来它和标题挤在顶部那一行，很容易被顶部栏/状态栏
+            // 压住点不到。放到底部之后既好按，也更符合「选完就往下走」的直觉。
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(48.dp),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Text("完成", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        },
+    ) { innerPadding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .fillMaxSize()
+                .padding(innerPadding),
         ) {
-            TextButton(onClick = onDismiss) { Text("取消") }
+
+            // ---------- 餐次 ----------
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MealType.entries.forEach { type ->
+                    FilterChip(
+                        selected = type.name == mealName,
+                        onClick = { mealName = type.name },
+                        label = { Text(type.label) },
+                    )
+                }
+            }
+
+            // ---------- 自定义入口 ----------
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AssistChip(
+                    onClick = { showCustomDialog = true },
+                    label = { Text("自定义记录（只填名称和热量）") },
+                )
+            }
+
+            // ---------- 搜索 ----------
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                label = { Text("搜索模板食物") },
+                placeholder = { Text("例如：米饭、鸡胸肉、苹果") },
+                singleLine = true,
+            )
+
             Text(
-                text = "添加食物",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                text = "记入「${meal.label}」· $date",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            TextButton(onClick = onDismiss) { Text("完成") }
-        }
+            HorizontalDivider()
 
-        // ---------- 餐次 ----------
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MealType.entries.forEach { type ->
-                FilterChip(
-                    selected = type.name == mealName,
-                    onClick = { mealName = type.name },
-                    label = { Text(type.label) },
-                )
-            }
-        }
-
-        // ---------- 自定义入口 ----------
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AssistChip(
-                onClick = { showCustomDialog = true },
-                label = { Text("自定义记录（只填名称和热量）") },
-            )
-        }
-
-        // ---------- 搜索 ----------
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            label = { Text("搜索模板食物") },
-            placeholder = { Text("例如：米饭、鸡胸肉、苹果") },
-            singleLine = true,
-        )
-
-        Text(
-            text = "记入「${meal.label}」· $date",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        HorizontalDivider()
-
-        // ---------- 模板列表 ----------
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(items = foods, key = { it.id }) { food ->
-                FoodRow(food = food, onClick = { selectedFood = food })
-                HorizontalDivider(Modifier.padding(start = 16.dp))
-            }
-            item {
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    text = "没有想要的？用上面的「自定义记录」，或者在设置页新增食物模板。",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
+            // ---------- 模板列表 ----------
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(items = foods, key = { it.id }) { food ->
+                    FoodRow(food = food, onClick = { selectedFood = food })
+                    HorizontalDivider(Modifier.padding(start = 16.dp))
+                }
+                item {
+                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        text = "没有想要的？用上面的「自定义记录」，或者在设置页新增食物模板。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
             }
         }
     }

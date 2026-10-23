@@ -10,9 +10,11 @@ import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.domain.TdeeEstimate
 import com.whattoeat.app.domain.TdeeEstimator
 import com.whattoeat.app.domain.UserProfile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -31,10 +33,14 @@ class SettingsViewModel(private val repository: DietRepository) : ViewModel() {
 
     private val today = LocalDate.now()
 
+    /**
+     * 设置页状态。
+     * 同其他页：Eagerly 提前加载 + 计算放到 Default 线程，不占主线程。
+     */
     val uiState: StateFlow<SettingsUiState> = combine(
-        repository.profile(),
-        repository.allFoods(),
-        repository.weights(),
+        repository.profile,
+        repository.allFoods,
+        repository.weights,
         repository.entriesBetween(today.minusDays(TdeeEstimator.WINDOW_DAYS - 1), today),
     ) { profile, foods, weights, entries ->
 
@@ -51,11 +57,13 @@ class SettingsViewModel(private val repository: DietRepository) : ViewModel() {
             foods = foods,
             autoEstimate = TdeeEstimator.estimate(profile, dailyKcal, weightPoints),
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = SettingsUiState(),
-    )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = SettingsUiState(),
+        )
 
     fun saveProfile(profile: UserProfile) {
         viewModelScope.launch { repository.saveProfile(profile) }

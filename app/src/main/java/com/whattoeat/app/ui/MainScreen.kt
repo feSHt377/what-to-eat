@@ -1,12 +1,20 @@
 package com.whattoeat.app.ui
 
-import androidx.compose.foundation.layout.Column
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,9 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.whattoeat.app.data.DietRepository
 import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.ui.add.AddFoodScreen
@@ -30,20 +37,26 @@ import com.whattoeat.app.ui.summary.SummaryScreen
 import com.whattoeat.app.ui.summary.SummaryViewModel
 
 /**
- * App 主界面：3 个 Tab + 一个全屏的「添加食物」页面。
+ * App 主界面：底部导航栏（3 个 Tab）+ 一个全屏的「添加食物」页面。
  *
  *  0 今日：每天吃了什么、还剩多少热量
  *  1 汇总：周期性数据（7/14/30 天）+ 代谢估算
  *  2 设置：个人档案（身高体重性别代谢）+ 食物模板管理 + 账号占位
  *
  * 页面不多，用状态切换就够；等以后页面变多再引入 navigation-compose。
+ *
+ * 关于「切 Tab 卡顿」：
+ *  三个 ViewModel 由 MainActivity 在**开屏动画期间**就创建好，
+ *  它们内部用 SharingStarted.Eagerly + Dispatchers.Default 提前把数据查好、算好，
+ *  所以这里 collectAsStateWithLifecycle 拿到的第一帧就是有数据的，不会出现「先空后满」的卡顿。
  */
 @Composable
-fun MainScreen(repository: DietRepository) {
-
-    val diaryViewModel: DiaryViewModel = viewModel(factory = DiaryViewModel.factory(repository))
-    val summaryViewModel: SummaryViewModel = viewModel(factory = SummaryViewModel.factory(repository))
-    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(repository))
+fun MainScreen(
+    repository: DietRepository,
+    diaryViewModel: DiaryViewModel,
+    summaryViewModel: SummaryViewModel,
+    settingsViewModel: SettingsViewModel,
+) {
 
     val diaryState by diaryViewModel.uiState.collectAsStateWithLifecycle()
     val summaryState by summaryViewModel.uiState.collectAsStateWithLifecycle()
@@ -54,6 +67,7 @@ fun MainScreen(repository: DietRepository) {
     var pendingMeal by remember { mutableStateOf(MealType.suggestFor()) }
 
     if (showAddScreen) {
+        // 「添加食物」是全屏页，它自己处理返回键（BackHandler），关闭后回到原来的 Tab
         AddFoodScreen(
             repository = repository,
             date = diaryState.date,
@@ -63,7 +77,35 @@ fun MainScreen(repository: DietRepository) {
         return
     }
 
+    // 系统返回键：在「汇总 / 设置」时先回到「今日」，在「今日」时交给系统退出 App
+    BackHandler(enabled = tab != 0) { tab = 0 }
+
     Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = tab == 0,
+                    onClick = { tab = 0 },
+                    icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                    label = { Text("今日") },
+                    alwaysShowLabel = true,
+                )
+                NavigationBarItem(
+                    selected = tab == 1,
+                    onClick = { tab = 1 },
+                    icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                    label = { Text("汇总") },
+                    alwaysShowLabel = true,
+                )
+                NavigationBarItem(
+                    selected = tab == 2,
+                    onClick = { tab = 2 },
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                    label = { Text("设置") },
+                    alwaysShowLabel = true,
+                )
+            }
+        },
         floatingActionButton = {
             if (tab == 0) {
                 FloatingActionButton(
@@ -73,22 +115,21 @@ fun MainScreen(repository: DietRepository) {
                         showAddScreen = true
                     },
                 ) {
-                    Text("＋", fontSize = 24.sp)
+                    Icon(Icons.Filled.Add, contentDescription = "添加食物")
                 }
             }
         },
     ) { innerPadding ->
-        Column(
+        // 底部导航栏的高度已经由 Scaffold 的 innerPadding 扣掉了，
+        // 这里额外给的 bottom padding 是为了给 FAB 留出位置：
+        // 只有「今日」页有 FAB，汇总/设置页不需要那么多空白。
+        val listBottomPadding = if (tab == 0) 96.dp else 24.dp
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("今日") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("汇总") })
-                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("设置") })
-            }
-
             when (tab) {
                 0 -> DiaryScreen(
                     state = diaryState,
@@ -100,11 +141,13 @@ fun MainScreen(repository: DietRepository) {
                         pendingMeal = meal
                         showAddScreen = true
                     },
+                    contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
 
                 1 -> SummaryScreen(
                     state = summaryState,
                     onSelectPeriod = summaryViewModel::setPeriod,
+                    contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
 
                 else -> SettingsScreen(
@@ -112,6 +155,7 @@ fun MainScreen(repository: DietRepository) {
                     onSaveProfile = settingsViewModel::saveProfile,
                     onSaveFood = settingsViewModel::saveFood,
                     onDeleteFood = settingsViewModel::deleteFood,
+                    contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
             }
         }

@@ -13,12 +13,14 @@ import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.domain.Nutrients
 import com.whattoeat.app.domain.TdeeEstimator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -59,12 +61,19 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
     /**
      * 日期一变就切换到新一天的数据流（flatMapLatest）。
      * Room 返回 Flow，所以增删记录后 UI 会自动刷新，无需手动 refresh。
+     *
+     * 线程/性能上的三个选择：
+     *  - `flowOn(Dispatchers.Default)`：下面这段「算 28 天摄入 + 跑体重回归 + 算 TDEE」
+     *    是在上游协程里做的，Room 的查询结果一到就开始算，全放主线程会掉帧。
+     *  - `SharingStarted.Eagerly`：ViewModel 一创建就开始收集，不用等界面真的来订阅。
+     *    这样开屏动画那两秒里数据就已经查好了，切 Tab 不会有等待。
+     *  - 数据本身来自 Repository 的**共享流**，三个页面共用同一次数据库查询。
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<DiaryUiState> = combine(
         _date.flatMapLatest { repository.entriesOf(it) },
-        repository.profile(),
-        repository.weights(),
+        repository.profile,
+        repository.weights,
         _date.flatMapLatest { date ->
             repository.entriesBetween(date.minusDays(TdeeEstimator.WINDOW_DAYS - 1), date)
         },
@@ -90,11 +99,13 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
             tdee = estimate.effectiveTdee,
             usingAdaptiveTdee = estimate.usingAdaptive,
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = DiaryUiState(),
-    )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = DiaryUiState(),
+        )
 
     fun previousDay() = _date.update { it.minusDays(1) }
 

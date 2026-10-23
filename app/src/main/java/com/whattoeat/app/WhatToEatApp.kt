@@ -20,10 +20,15 @@ class AppContainer(context: Context) {
 
     private val database: AppDatabase = AppDatabase.create(context)
 
-    val repository: DietRepository = DietRepository(database)
+    /**
+     * App 级别的协程作用域：用于不随页面销毁的初始化工作，
+     * 同时也是 Repository 里那些「共享查询流」的宿主作用域。
+     *
+     * 用 SupervisorJob：一个子任务失败不会连带干掉其它任务。
+     */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** App 级别的协程作用域：用于不随页面销毁的初始化工作 */
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val repository: DietRepository = DietRepository(database, appScope)
 
     init {
         // 首次启动时灌入内置食物库（幂等，已有数据就跳过）
