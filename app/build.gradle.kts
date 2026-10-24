@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)          // Room 的注解处理器需要 KSP
 }
+
+// 本地签名只从被 Git 忽略的 keystore.properties 读取；CI 改用同名环境变量。
+// 绝不能把密钥库、密码或密钥本身提交到公开仓库。
+val signingProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+fun signingProperty(name: String): String? =
+    (System.getenv(name) ?: signingProperties.getProperty(name))?.takeIf { it.isNotBlank() }
 
 android {
     namespace = "com.whattoeat.app"
@@ -16,15 +27,30 @@ android {
         // 否则要额外开 coreLibraryDesugaring。Android 8.0 已覆盖绝大多数设备。
         minSdk = 26
         targetSdk = 36
-        // 与 GitHub Release 的 tag 保持一致：v0.2.0 → versionName 0.2.0
-        versionCode = 2
-        versionName = "0.2.0"
+        // 与 GitHub Release 的 tag 保持一致：v0.3.0 → versionName 0.3.0
+        versionCode = 3
+        versionName = "0.3.0"
+    }
+
+    signingConfigs {
+        if (signingProperty("RELEASE_STORE_FILE") != null) {
+            create("release") {
+                storeFile = file(requireNotNull(signingProperty("RELEASE_STORE_FILE")))
+                storePassword = signingProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = signingProperty("RELEASE_KEY_ALIAS")
+                keyPassword = signingProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            // 已确认使用 kotlin.serialization 编译期生成器，不依赖反射序列化。
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (signingProperty("RELEASE_STORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

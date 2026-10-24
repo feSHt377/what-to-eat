@@ -27,7 +27,7 @@
 - ZIP 备份：一键导出或导入档案、食物模板、饮食与体重记录
 - 自动检查 GitHub Releases，有新版本时跳转发布页下载
 
-饮食数据只存在本机 SQLite，**不需要账号**。仅更新检查会访问公开 GitHub API，不上传饮食数据。当前版本 v0.2.0。
+饮食数据只存在本机 SQLite，**不需要账号**。仅更新检查会访问公开 GitHub API，不上传饮食数据。当前版本 v0.3.0。
 
 ---
 
@@ -92,16 +92,22 @@ TDEE = 平均日摄入 − (kg/天 × 7700)
 
 ### CI 与发布
 
-`.github/workflows/android.yml` 在 `main` 推送、PR 和手动触发时执行单元测试并构建 Debug APK，APK 同时作为 Actions artifact 上传。
+`.github/workflows/android.yml` 在 `main` 推送、PR 和手动触发时执行单元测试并构建 Release APK，APK 同时作为 Actions artifact 上传。标签与手动发布会使用固定密钥签名；没有 Secrets 的 PR 只构建未签名包，不能发布。
 
 发布新版本时，先更新 `app/build.gradle.kts` 中的 `versionCode` 与 `versionName`，再推送匹配的版本标签：
 
 ```bat
-git tag -a v0.2.0 -m "WhatToEat v0.2.0"
-git push origin v0.2.0
+git tag -a v0.3.0 -m "WhatToEat v0.3.0"
+git push origin v0.3.0
 ```
 
-标签构建成功后会自动创建 GitHub Release、生成发布说明并上传 APK。当前发布的是 Debug 签名 APK，适合测试；正式分发前应配置独立 Release 签名。
+标签构建成功后会自动创建 GitHub Release、生成发布说明并上传签名的 Release APK。CI 会校验签名，并直接发布构建阶段上传的同一个 APK，不重新生成密钥或重新打包。
+
+发布前需要在仓库 **Settings → Secrets and variables → Actions** 配置四个 repository secrets：`RELEASE_KEYSTORE_BASE64`（固定 JKS 的 Base64）、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_ALIAS`、`RELEASE_KEY_PASSWORD`。缺少任何一项，标签发布会在构建前停止。
+
+本地签名参考 `keystore.properties.example`。真实 `.jks`、`.signing/` 和 `keystore.properties` 均被 Git 忽略，不得提交。密钥库与密码必须离线备份；更换或丢失密钥会使后续 APK 无法覆盖旧版。
+
+从 v0.2.0 Debug 测试包首次切换 Release：先在旧版导出 ZIP，再卸载 Debug 版并安装 Release，最后导入 ZIP。卸载会清空本机数据，不能跳过备份。相同 Release 密钥签名的后续版本可直接覆盖升级。
 
 ### 技术栈
 
