@@ -6,6 +6,7 @@ import com.whattoeat.app.data.db.LogEntryEntity
 import com.whattoeat.app.data.db.UserProfileEntity
 import com.whattoeat.app.data.db.WeightLogEntity
 import com.whattoeat.app.data.seed.FoodSeed
+import androidx.room.withTransaction
 import com.whattoeat.app.domain.ActivityLevel
 import com.whattoeat.app.domain.Goal
 import com.whattoeat.app.domain.MealType
@@ -234,11 +235,13 @@ class DietRepository(
 
     /** 首次启动时写入内置食物库与默认档案（幂等：已有数据就跳过） */
     suspend fun ensureSeedData() = withContext(Dispatchers.IO) {
-        if (db.foodDao().count() == 0) {
-            db.foodDao().insertAll(FoodSeed.foods)
-        }
-        if (db.profileDao().get() == null) {
-            db.profileDao().upsert(UserProfile().toEntity())
+        db.withTransaction {
+            // 以档案是否存在判断首次启动；用户可以在备份中保留空食物库。
+            // 检查与初始化在同一事务中，避免冷启动时与备份恢复交错。
+            if (db.profileDao().get() == null) {
+                db.foodDao().insertAll(FoodSeed.foods)
+                db.profileDao().upsert(UserProfile().toEntity())
+            }
         }
     }
 }

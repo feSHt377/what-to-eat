@@ -16,6 +16,7 @@ activityCompose = "1.9.3"
 composeBom = "2025.10.01"
 room = "2.7.2"
 coroutines = "1.9.0"
+serialization = "1.9.0"
 junit = "4.13.2"
 
 [libraries]
@@ -41,6 +42,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 
@@ -48,4 +50,5 @@ junit = { module = "junit:junit", version.ref = "junit" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -1,5 +1,10 @@
 package com.whattoeat.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +24,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,10 +37,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.whattoeat.app.BuildConfig
 import com.whattoeat.app.data.db.FoodEntity
+import com.whattoeat.app.data.update.ReleaseChecker
 import com.whattoeat.app.domain.ActivityLevel
 import com.whattoeat.app.domain.Goal
 import com.whattoeat.app.domain.Metabolism
@@ -45,6 +54,8 @@ import com.whattoeat.app.ui.common.SectionCard
 import com.whattoeat.app.ui.common.fmt0
 import com.whattoeat.app.ui.common.fmt1
 import com.whattoeat.app.ui.theme.NutrientColors
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * 「设置」页：
@@ -58,19 +69,55 @@ fun SettingsScreen(
     onSaveProfile: (UserProfile) -> Unit,
     onSaveFood: (FoodEntity) -> Unit,
     onDeleteFood: (FoodEntity) -> Unit,
+    backupBusy: Boolean,
+    backupMessage: String?,
+    onClearBackupMessage: () -> Unit,
+    onExportBackup: (Uri) -> Unit,
+    onImportBackup: (Uri) -> Unit,
+    updateStatus: UpdateStatus,
+    onCheckUpdates: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
     var showNewFoodDialog by remember { mutableStateOf(false) }
     var editingFood by remember { mutableStateOf<FoodEntity?>(null) }
     var deletingFood by remember { mutableStateOf<FoodEntity?>(null) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri -> uri?.let(onExportBackup) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> pendingImportUri = uri }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { AccountCard(Modifier.padding(horizontal = 16.dp)) }
+        item {
+            BackupCard(
+                busy = backupBusy,
+                onExport = {
+                    val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                    exportLauncher.launch("WhatToEat-backup-$timestamp.zip")
+                },
+                onImport = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+
+        item {
+            UpdateCard(
+                status = updateStatus,
+                onCheck = onCheckUpdates,
+                onOpenRelease = { url ->
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
 
         item {
             ProfileCard(
@@ -125,6 +172,8 @@ fun SettingsScreen(
     }
 
     // ---------- 新增 / 编辑弹窗 ----------
+    // 备份操作期间拦截系统返回，避免文件选择结果迟到后重新执行危险操作。
+    BackHandler(enabled = backupBusy) { }
     if (showNewFoodDialog) {
         FoodTemplateDialog(
             initial = FoodEntity(
@@ -173,6 +222,32 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = { deletingFood = null }) { Text("取消") } },
         )
     }
+
+    if (backupMessage != null) {
+        AlertDialog(
+            onDismissRequest = onClearBackupMessage,
+            title = { Text("数据备份") },
+            text = { Text(backupMessage) },
+            confirmButton = { TextButton(onClick = onClearBackupMessage) { Text("知道了") } },
+        )
+    }
+
+    pendingImportUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pendingImportUri = null },
+            title = { Text("确认导入并覆盖？") },
+            text = {
+                Text("导入会完整替换当前档案、食物模板、饮食和体重记录，且无法撤销。\n\n建议先导出当前数据作为备份。ZIP 校验失败时不会改变现有数据。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportUri = null
+                    onImportBackup(uri)
+                }) { Text("导入并覆盖") }
+            },
+            dismissButton = { TextButton(onClick = { pendingImportUri = null }) { Text("取消") } },
+        )
+    }
 }
 
 @Composable
@@ -181,14 +256,95 @@ private fun AccountCard(modifier: Modifier = Modifier) {
         Text("账号", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "本版本还没有接入账号系统，所有数据只保存在这台手机上。\n后续会支持：登录、多设备同步、云端备份。",
+            text = "本版本还没有接入账号系统，饮食数据只保存在这台手机上。\n可以使用 ZIP 备份；后续再支持登录和多设备同步。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = { /* 占位：账号功能未开放 */ }, enabled = false) {
-            Text("登录 / 注册（暂未开放）")
+        OutlinedButton(onClick = { }, enabled = false) { Text("登录 / 注册（暂未开放）") }
+    }
+}
+
+@Composable
+private fun BackupCard(
+    busy: Boolean,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SectionCard(modifier = modifier) {
+        Text("数据备份", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "导出为一个 ZIP 文件，包含个人配置、食物模板、饮食和体重记录。导入会覆盖当前数据。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (busy) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.width(24.dp).height(24.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("正在处理备份，请勿关闭应用…", style = MaterialTheme.typography.bodySmall)
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onExport, modifier = Modifier.weight(1f)) { Text("一键导出") }
+                OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f)) { Text("一键导入") }
+            }
         }
+    }
+}
+
+@Composable
+private fun UpdateCard(
+    status: UpdateStatus,
+    onCheck: () -> Unit,
+    onOpenRelease: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SectionCard(modifier = modifier) {
+        Text("应用更新", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text("当前版本 ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(4.dp))
+        when (status) {
+            UpdateStatus.Idle -> Text("准备检查更新…", style = MaterialTheme.typography.bodySmall)
+            UpdateStatus.Checking -> Text("正在检查 GitHub Releases…", style = MaterialTheme.typography.bodySmall)
+            UpdateStatus.Current -> Text(
+                "已是最新版本",
+                color = NutrientColors.Fiber,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            is UpdateStatus.Available -> {
+                Text(
+                    "发现新版本 ${status.version}",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onOpenRelease(status.url) }) { Text("前往 GitHub Release") }
+            }
+            is UpdateStatus.Error -> Text(
+                "检查失败：${status.message}",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onCheck, enabled = status !is UpdateStatus.Checking) {
+                Text("重新检查")
+            }
+            TextButton(onClick = { onOpenRelease(ReleaseChecker.RELEASES_URL) }) {
+                Text("查看发布页")
+            }
+        }
+        Text(
+            "仅检查公开 GitHub Release，不自动下载或安装。更新检查需要联网；饮食数据不上传。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -554,8 +710,8 @@ private fun AboutCard(modifier: Modifier = Modifier) {
     SectionCard(modifier = modifier) {
         Text("关于", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
-        LabeledValue("版本", "0.1.0（demo）")
-        LabeledValue("数据存储", "仅本机（SQLite），不联网")
+        LabeledValue("版本", BuildConfig.VERSION_NAME)
+        LabeledValue("数据存储", "仅本机（SQLite）；更新检查不传输饮食数据")
         LabeledValue("许可协议", "PolyForm Noncommercial 1.0.0")
         Spacer(Modifier.height(6.dp))
         Text(

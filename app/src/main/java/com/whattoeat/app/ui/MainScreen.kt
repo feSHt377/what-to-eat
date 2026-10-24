@@ -157,6 +157,13 @@ fun MainScreen(
                     onSaveProfile = settingsViewModel::saveProfile,
                     onSaveFood = settingsViewModel::saveFood,
                     onDeleteFood = settingsViewModel::deleteFood,
+                    backupBusy = settingsViewModel.backupBusy.collectAsStateWithLifecycle().value,
+                    backupMessage = settingsViewModel.backupMessage.collectAsStateWithLifecycle().value,
+                    onClearBackupMessage = settingsViewModel::clearBackupMessage,
+                    onExportBackup = settingsViewModel::exportBackup,
+                    onImportBackup = settingsViewModel::importBackup,
+                    updateStatus = settingsViewModel.updateStatus.collectAsStateWithLifecycle().value,
+                    onCheckUpdates = settingsViewModel::checkForUpdates,
                     contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
             }

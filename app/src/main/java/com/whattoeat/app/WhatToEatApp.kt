@@ -3,11 +3,13 @@ package com.whattoeat.app
 import android.app.Application
 import android.content.Context
 import com.whattoeat.app.data.DietRepository
+import com.whattoeat.app.data.backup.BackupManager
 import com.whattoeat.app.data.db.AppDatabase
+import com.whattoeat.app.data.update.ReleaseChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 /**
  * 极简「依赖注入容器」。
@@ -30,10 +32,15 @@ class AppContainer(context: Context) {
 
     val repository: DietRepository = DietRepository(database, appScope)
 
-    init {
-        // 首次启动时灌入内置食物库（幂等，已有数据就跳过）
-        appScope.launch { repository.ensureSeedData() }
-    }
+    // 备份操作会等待此任务，避免首次启动的初始化与立即导入互相覆盖。
+    private val initialization = appScope.async { repository.ensureSeedData() }
+
+    val backupManager: BackupManager = BackupManager(
+        database,
+        context.contentResolver,
+        initialization,
+    )
+    val releaseChecker: ReleaseChecker = ReleaseChecker()
 }
 
 class WhatToEatApp : Application() {

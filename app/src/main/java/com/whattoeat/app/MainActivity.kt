@@ -39,7 +39,13 @@ class MainActivity : ComponentActivity() {
                 val summaryViewModel: SummaryViewModel =
                     viewModel(factory = SummaryViewModel.factory(container.repository))
                 val settingsViewModel: SettingsViewModel =
-                    viewModel(factory = SettingsViewModel.factory(container.repository))
+                    viewModel(
+                        factory = SettingsViewModel.factory(
+                            container.repository,
+                            container.backupManager,
+                            container.releaseChecker,
+                        ),
+                    )
 
                 if (showSplash) {
                     SplashScreen(onFinished = { showSplash = false })

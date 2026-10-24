@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)          // Room 的注解处理器需要 KSP
 }
 
@@ -15,8 +16,9 @@ android {
         // 否则要额外开 coreLibraryDesugaring。Android 8.0 已覆盖绝大多数设备。
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // 与 GitHub Release 的 tag 保持一致：v0.2.0 → versionName 0.2.0
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -33,6 +35,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -76,6 +79,7 @@ dependencies {
 
     // ---- 协程 ----
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)       // 版本化 ZIP 备份
 
     // ---- 测试 ----
     testImplementation(libs.junit)

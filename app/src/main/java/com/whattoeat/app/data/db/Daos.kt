@@ -22,8 +22,12 @@ interface FoodDao {
     @Query("SELECT * FROM foods ORDER BY builtIn DESC, category ASC, name ASC")
     fun all(): Flow<List<FoodEntity>>
 
-    @Query("SELECT COUNT(*) FROM foods")
-    suspend fun count(): Int
+
+    @Query("SELECT * FROM foods ORDER BY id ASC")
+    suspend fun snapshot(): List<FoodEntity>
+
+    @Query("DELETE FROM foods")
+    suspend fun deleteAll()
 
     @Insert
     suspend fun insertAll(items: List<FoodEntity>)
@@ -48,6 +52,15 @@ interface LogDao {
     @Query("SELECT * FROM log_entries WHERE date BETWEEN :fromDate AND :toDate ORDER BY date ASC")
     fun between(fromDate: String, toDate: String): Flow<List<LogEntryEntity>>
 
+    @Query("SELECT * FROM log_entries ORDER BY id ASC")
+    suspend fun snapshot(): List<LogEntryEntity>
+
+    @Insert
+    suspend fun insertAll(items: List<LogEntryEntity>)
+
+    @Query("DELETE FROM log_entries")
+    suspend fun deleteAll()
+
     @Insert
     suspend fun insert(entry: LogEntryEntity): Long
 
@@ -64,6 +77,12 @@ interface WeightDao {
     /** 更新成最近的一条体重，用于同步档案里的体重 */
     @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT 1")
     suspend fun latest(): WeightLogEntity?
+
+    @Query("SELECT * FROM weight_logs ORDER BY date ASC")
+    suspend fun snapshot(): List<WeightLogEntity>
+
+    @Query("DELETE FROM weight_logs")
+    suspend fun deleteAll()
 
     /** 同一天重复记录直接覆盖 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -84,4 +103,7 @@ interface ProfileDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: UserProfileEntity)
+
+    @Query("DELETE FROM user_profile")
+    suspend fun deleteAll()
 }

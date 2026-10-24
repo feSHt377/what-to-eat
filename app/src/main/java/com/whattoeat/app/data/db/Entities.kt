@@ -3,11 +3,13 @@ package com.whattoeat.app.data.db
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * 食物库（每 100 克的营养值）。
  * 内置食物 [builtIn] = true；用户手动新增的为 false。
  */
+@Serializable
 @Entity(tableName = "foods")
 data class FoodEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -31,6 +33,7 @@ data class FoodEntity(
  * 原因：以后你修改/删除食物库里的数据，历史记录不应该跟着变。
  * 这是"记账"类 App 的通用做法（会计上叫快照）。
  */
+@Serializable
 @Entity(tableName = "log_entries", indices = [Index("date"), Index("foodId")])
 data class LogEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -51,6 +54,7 @@ data class LogEntryEntity(
 )
 
 /** 体重记录：一天一条（同一天再记会覆盖）。没记录的日子就没有行，就是「空」 */
+@Serializable
 @Entity(tableName = "weight_logs")
 data class WeightLogEntity(
     @PrimaryKey val date: String,
@@ -58,6 +62,7 @@ data class WeightLogEntity(
 )
 
 /** 用户档案：单条记录，主键恒为 1 */
+@Serializable
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
     @PrimaryKey val id: Int = SINGLETON_ID,

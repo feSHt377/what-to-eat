@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 仅用于检查 GitHub Release；饮食数据仍然只保存在本机 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".WhatToEatApp"
         android:allowBackup="true"
