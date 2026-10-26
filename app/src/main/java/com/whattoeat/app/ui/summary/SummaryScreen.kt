@@ -205,6 +205,23 @@ fun SummaryScreen(
             }
         }
 
+        // ---------- 饮水监控 ----------
+        item {
+            SectionCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text("💧 饮水监控", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                LabeledValue("日均饮水", if (state.waterLoggedDays > 0) "${state.avgWaterMl.fmt0()} ml" else "暂无记录")
+                LabeledValue("每日目标", "${state.waterGoalMl} ml")
+                LabeledValue("饮水达标", "${state.waterOnTargetDays} / ${state.periodDays} 天")
+                Text(
+                    text = "日均仅统计有饮水记录的 ${state.waterLoggedDays} 天；未记录不记为 0。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+
         // ---------- 日均营养素 ----------
         item {
             SectionCard(modifier = Modifier.padding(horizontal = 16.dp)) {

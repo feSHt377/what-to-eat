@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.whattoeat.app.data.DietRepository
 import com.whattoeat.app.data.db.LogEntryEntity
 import com.whattoeat.app.data.db.WeightLogEntity
+import com.whattoeat.app.data.db.WaterLogEntity
 import com.whattoeat.app.domain.DailyTargets
 import com.whattoeat.app.domain.TdeeEstimate
 import com.whattoeat.app.domain.TdeeEstimator
@@ -48,6 +49,10 @@ data class SummaryUiState(
     val estimate: TdeeEstimate? = null,
     val targets: DailyTargets = DailyTargets(0.0, 0.0, 0.0, 0.0),
     val weightChangeKg: Double? = null,
+    val waterGoalMl: Int = 2000,
+    val waterLoggedDays: Int = 0,
+    val avgWaterMl: Double = 0.0,
+    val waterOnTargetDays: Int = 0,
 ) {
     /** 累计缺口为负 = 有热量缺口（在减脂方向） */
     val isDeficit: Boolean get() = cumulativeBalance <= 0.0
@@ -80,9 +85,10 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
         repository.weights,
         // 一次拿满 28 天，切换周期时不重新查库
         repository.entriesBetween(today.minusDays(TdeeEstimator.WINDOW_DAYS - 1), today),
+        repository.waterBetween(today.minusDays(TdeeEstimator.WINDOW_DAYS - 1), today),
         _periodDays,
-    ) { profile, weights, entries, period ->
-        buildState(profile, weights, entries, period)
+    ) { profile, weights, entries, waterLogs, period ->
+        buildState(profile, weights, entries, waterLogs, period)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(
@@ -99,6 +105,7 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
         profile: UserProfile,
         weights: List<WeightLogEntity>,
         entries: List<LogEntryEntity>,
+        waterLogs: List<WaterLogEntity>,
         periodDays: Int,
     ): SummaryUiState {
 
@@ -156,6 +163,12 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
             loggedPoints.sumOf { nutrientsByDate[it.date]?.get(3) ?: 0.0 } / loggedDays
         } else 0.0
 
+        val waterByDate = waterLogs
+            .groupBy { LocalDate.parse(it.date) }
+            .mapValues { (_, logs) -> logs.sumOf { it.amountMl } }
+        val periodStartForWater = today.minusDays((periodDays - 1).toLong())
+        val periodWater = waterByDate.filterKeys { it >= periodStartForWater }
+
         val cumulativeBalance = loggedPoints.sumOf { it.kcal - targets.kcal }
         val onTargetDays = loggedPoints.count { it.inTarget }
 
@@ -183,6 +196,10 @@ class SummaryViewModel(private val repository: DietRepository) : ViewModel() {
             estimate = estimate,
             targets = targets,
             weightChangeKg = weightChange,
+            waterGoalMl = profile.waterGoalMl,
+            waterLoggedDays = periodWater.size,
+            avgWaterMl = periodWater.values.takeIf { it.isNotEmpty() }?.average() ?: 0.0,
+            waterOnTargetDays = periodWater.values.count { it >= profile.waterGoalMl },
         )
     }
 

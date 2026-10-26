@@ -4,9 +4,11 @@ import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.data.db.LogEntryEntity
 import com.whattoeat.app.data.db.UserProfileEntity
 import com.whattoeat.app.data.db.WeightLogEntity
+import com.whattoeat.app.data.db.WaterLogEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -28,10 +30,14 @@ class BackupCodecTest {
             LogEntryEntity(4, "2026-10-24", "BREAKFAST", 1, "燕麦", 50.0, 190.0, 6.0, 3.5, 30.0, 5.0),
         ),
         weights = listOf(WeightLogEntity("2026-10-24", 58.0)),
+        waterLogs = listOf(
+            WaterLogEntity(1, "2026-10-24", 250, 1_700_000_000_000),
+            WaterLogEntity(2, "2026-10-24", 500, 1_700_000_001_000),
+        ),
     )
 
     @Test
-    fun `ZIP导出导入完整保留四张表数据`() {
+    fun `ZIP导出导入完整保留五张表数据`() {
         val output = ByteArrayOutputStream()
         BackupCodec.write(output, sample)
         assertEquals(sample, BackupCodec.read(ByteArrayInputStream(output.toByteArray())))
@@ -61,6 +67,24 @@ class BackupCodecTest {
         assertEquals(0.0, restored.foods.single().fiberPer100g, 0.0)
         assertNull(restored.profile.customDeltaKcal)
         assertNull(restored.profile.manualTdeeKcal)
+        assertEquals(2000, restored.profile.waterGoalMl)
+        assertTrue(restored.waterLogs.isEmpty())
+    }
+
+    @Test
+    fun `无效饮水记录和重复ID在覆盖前被拒绝`() {
+        val invalidAmount = sample.copy(
+            waterLogs = listOf(WaterLogEntity(1, "2026-10-24", 0)),
+        )
+        assertThrows(IllegalArgumentException::class.java) { invalidAmount.validate() }
+
+        val duplicateId = sample.copy(
+            waterLogs = listOf(
+                WaterLogEntity(1, "2026-10-24", 200),
+                WaterLogEntity(1, "2026-10-25", 250),
+            ),
+        )
+        assertThrows(IllegalArgumentException::class.java) { duplicateId.validate() }
     }
 
     @Test

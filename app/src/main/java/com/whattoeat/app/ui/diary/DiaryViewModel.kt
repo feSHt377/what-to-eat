@@ -7,8 +7,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.whattoeat.app.data.DietRepository
 import com.whattoeat.app.data.db.LogEntryEntity
+import com.whattoeat.app.data.db.WaterLogEntity
 import com.whattoeat.app.data.toNutrients
 import com.whattoeat.app.domain.DailyTargets
+import com.whattoeat.app.domain.Hydration
 import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.domain.Nutrients
 import com.whattoeat.app.domain.TdeeEstimator
@@ -43,9 +45,14 @@ data class DiaryUiState(
     val weightLogCount: Int = 0,
     /** 最近 28 天里有几天记了饮食。反推代谢还要求这个够数 */
     val loggedDayCount: Int = 0,
+    val waterLogs: List<WaterLogEntity> = emptyList(),
+    val waterTotalMl: Int = 0,
+    val waterGoalMl: Int = Hydration.DEFAULT_GOAL_ML,
 ) {
     val isOverKcal: Boolean get() = totals.kcal > targets.kcal
     val remainingKcal: Double get() = targets.kcal - totals.kcal
+    val waterProgress: Float get() = Hydration.progress(waterTotalMl, waterGoalMl)
+    val waterRemainingMl: Int get() = Hydration.remainingMl(waterTotalMl, waterGoalMl)
 
     /** 体重够不够两次 —— 不够的话代谢只能退回公式/平均值 */
     val hasEnoughWeightForTrend: Boolean get() = weightLogCount >= MIN_WEIGHT_POINTS
@@ -60,6 +67,13 @@ data class DiaryUiState(
         const val MIN_WEIGHT_POINTS = 2
     }
 }
+
+private data class DailyData(
+    val date: LocalDate,
+    val entries: List<LogEntryEntity>,
+    val waterLogs: List<WaterLogEntity>,
+    val windowEntries: List<LogEntryEntity>,
+)
 
 /**
  * 每日记录页 ViewModel。
@@ -84,15 +98,25 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
      *  - 数据本身来自 Repository 的**共享流**，三个页面共用同一次数据库查询。
      */
     @OptIn(ExperimentalCoroutinesApi::class)
+    private val dailyState = _date.flatMapLatest { date ->
+        combine(
+            repository.entriesOf(date),
+            repository.waterOf(date),
+            repository.entriesBetween(date.minusDays(TdeeEstimator.WINDOW_DAYS - 1), date),
+        ) { entries, waterLogs, windowEntries ->
+            DailyData(date, entries, waterLogs, windowEntries)
+        }
+    }
+
     val uiState: StateFlow<DiaryUiState> = combine(
-        _date.flatMapLatest { repository.entriesOf(it) },
         repository.profile,
         repository.weights,
-        _date.flatMapLatest { date ->
-            repository.entriesBetween(date.minusDays(TdeeEstimator.WINDOW_DAYS - 1), date)
-        },
-        _date,
-    ) { entries, profile, weights, windowEntries, date ->
+        dailyState,
+    ) { profile, weights, dailyData ->
+        val date = dailyData.date
+        val entries = dailyData.entries
+        val waterLogs = dailyData.waterLogs
+        val windowEntries = dailyData.windowEntries
 
         // 最近 28 天里每天的总摄入
         val dailyKcal: Map<LocalDate, Double> = windowEntries
@@ -116,6 +140,9 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
             weightKg = weights.firstOrNull { it.date == date.toString() }?.weightKg,
             weightLogCount = weights.size,
             loggedDayCount = dailyKcal.size,
+            waterLogs = waterLogs,
+            waterTotalMl = waterLogs.sumOf { it.amountMl },
+            waterGoalMl = profile.waterGoalMl,
         )
     }
         .flowOn(Dispatchers.Default)
@@ -147,6 +174,22 @@ class DiaryViewModel(private val repository: DietRepository) : ViewModel() {
     fun clearWeight() {
         val targetDate = _date.value
         viewModelScope.launch { repository.deleteWeight(targetDate) }
+    }
+
+    fun addWater(amountMl: Int) {
+        if (!Hydration.isValidAmount(amountMl)) return
+        val targetDate = _date.value
+        viewModelScope.launch { repository.addWater(targetDate, amountMl) }
+    }
+
+    fun undoWater() {
+        val targetDate = _date.value
+        viewModelScope.launch { repository.undoLastWater(targetDate) }
+    }
+
+    fun clearWater() {
+        val targetDate = _date.value
+        viewModelScope.launch { repository.clearWater(targetDate) }
     }
 
     fun deleteEntry(id: Long) {

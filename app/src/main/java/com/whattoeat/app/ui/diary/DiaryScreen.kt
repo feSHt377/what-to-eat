@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -54,6 +55,9 @@ fun DiaryScreen(
     onAddToMeal: (MealType) -> Unit,
     onSaveWeight: (Double) -> Unit,
     onClearWeight: () -> Unit,
+    onAddWater: (Int) -> Unit,
+    onUndoWater: () -> Unit,
+    onClearWater: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -125,6 +129,17 @@ fun DiaryScreen(
                 Spacer(Modifier.height(12.dp))
                 MacroBar("膳食纤维", state.totals.fiberG, state.targets.fiberG, NutrientColors.Fiber)
             }
+        }
+
+        // ---------- 当天饮水 ----------
+        item {
+            WaterCard(
+                state = state,
+                onAdd = onAddWater,
+                onUndo = onUndoWater,
+                onClear = onClearWater,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
 
         // ---------- 当天体重 ----------
@@ -217,6 +232,139 @@ private fun MealSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WaterCard(
+    state: DiaryUiState,
+    onAdd: (Int) -> Unit,
+    onUndo: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var customAmount by remember(state.date) { mutableStateOf("") }
+    var showRecords by remember(state.date) { mutableStateOf(false) }
+    var showClearConfirmation by remember(state.date) { mutableStateOf(false) }
+    val amount = customAmount.toIntOrNull()
+    val amountValid = amount != null && com.whattoeat.app.domain.Hydration.isValidAmount(amount)
+
+    SectionCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("💧 喝水", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = if (state.waterTotalMl >= state.waterGoalMl) "今日目标已达成" else "还差 ${state.waterRemainingMl} ml",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (state.waterTotalMl >= state.waterGoalMl) NutrientColors.Fiber
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "${state.waterTotalMl}",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = NutrientColors.Protein,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "/ ${state.waterGoalMl} ml",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { state.waterProgress },
+            modifier = Modifier.fillMaxWidth(),
+            color = NutrientColors.Protein,
+        )
+        Text(
+            text = "已记录 ${state.waterLogs.size} 次 · 达标 ${(state.waterProgress * 100).toInt()}%",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(200, 250, 500).forEach { amountMl ->
+                Button(onClick = { onAdd(amountMl) }, modifier = Modifier.weight(1f)) {
+                    Text("+$amountMl ml")
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = customAmount,
+                onValueChange = { customAmount = it.filter(Char::isDigit).take(4) },
+                label = { Text("自定义饮水量 ml") },
+                placeholder = { Text("例如 300") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                isError = customAmount.isNotEmpty() && !amountValid,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    amount?.let(onAdd)
+                    customAmount = ""
+                },
+                enabled = amountValid,
+            ) { Text("记录") }
+        }
+        if (customAmount.isNotEmpty() && !amountValid) {
+            Text(
+                "单次请输入 1–2000 ml",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onUndo, enabled = state.waterLogs.isNotEmpty()) { Text("撤销上次") }
+            TextButton(onClick = { showRecords = !showRecords }, enabled = state.waterLogs.isNotEmpty()) {
+                Text(if (showRecords) "收起记录" else "查看记录")
+            }
+            if (state.waterLogs.isNotEmpty()) {
+                TextButton(onClick = { showClearConfirmation = true }) { Text("清零") }
+            }
+        }
+        if (showRecords) {
+            state.waterLogs.takeLast(10).reversed().forEach { log ->
+                Text(
+                    text = "${log.amountMl} ml · ${java.time.Instant.ofEpochMilli(log.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
+            }
+        }
+        Text(
+            text = "饮水量仅用于健康记录，不计入食物热量。每日目标可在设置中修改。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (showClearConfirmation) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("清零当天饮水？") },
+            text = { Text("将删除 ${state.date} 的全部饮水记录，不会影响饮食和体重数据。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onClear()
+                    showClearConfirmation = false
+                }) { Text("清零") }
+            },
+            dismissButton = { TextButton(onClick = { showClearConfirmation = false }) { Text("取消") } },
+        )
     }
 }
 

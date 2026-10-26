@@ -61,6 +61,16 @@ data class WeightLogEntity(
     val weightKg: Double,
 )
 
+/** 一次饮水记录。与饮食分开保存，避免把饮水误计为食物热量。 */
+@Serializable
+@Entity(tableName = "water_logs", indices = [Index("date")])
+data class WaterLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val amountMl: Int,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
 /** 用户档案：单条记录，主键恒为 1 */
 @Serializable
 @Entity(tableName = "user_profile")
@@ -76,6 +86,8 @@ data class UserProfileEntity(
     val manualTdeeKcal: Double? = null,
     /** 自定义每日热量差；null 表示"用目标预设值" */
     val customDeltaKcal: Double? = null,
+    /** 每日饮水目标，单位为毫升。 */
+    val waterGoalMl: Int = 2000,
 ) {
     companion object {
         const val SINGLETON_ID = 1

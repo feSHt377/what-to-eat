@@ -4,6 +4,8 @@ import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.data.db.LogEntryEntity
 import com.whattoeat.app.data.db.UserProfileEntity
 import com.whattoeat.app.data.db.WeightLogEntity
+import com.whattoeat.app.data.db.WaterLogEntity
+import com.whattoeat.app.domain.Hydration
 import com.whattoeat.app.domain.ActivityLevel
 import com.whattoeat.app.domain.Goal
 import com.whattoeat.app.domain.MealType
@@ -27,6 +29,7 @@ data class BackupData(
     val foods: List<FoodEntity> = emptyList(),
     val entries: List<LogEntryEntity> = emptyList(),
     val weights: List<WeightLogEntity> = emptyList(),
+    val waterLogs: List<WaterLogEntity> = emptyList(),
 ) {
     fun validate() {
         require(formatVersion == CURRENT_FORMAT_VERSION) {
@@ -41,10 +44,12 @@ data class BackupData(
         require(profile.heightCm > 0 && profile.weightKg > 0) { "档案中的身高或体重无效" }
         profile.manualTdeeKcal?.let { requireFinite(it, "每日代谢") }
         profile.customDeltaKcal?.let { requireFinite(it, "每日热量差") }
+        require(Hydration.isValidGoal(profile.waterGoalMl)) { "每日饮水目标范围无效" }
 
         require(foods.size <= MAX_ROWS) { "食物模板数量超过备份上限" }
         require(entries.size <= MAX_ROWS) { "饮食记录数量超过备份上限" }
         require(weights.size <= MAX_ROWS) { "体重记录数量超过备份上限" }
+        require(waterLogs.size <= MAX_ROWS) { "饮水记录数量超过备份上限" }
         require(foods.map { it.id }.distinct().size == foods.size) { "食物模板 ID 重复" }
         require(entries.map { it.id }.distinct().size == entries.size) { "饮食记录 ID 重复" }
 
@@ -68,6 +73,12 @@ data class BackupData(
             validateDate(it.date, "体重记录")
             requireFinite(it.weightKg, "体重")
             require(it.weightKg > 0) { "体重记录数值无效" }
+        }
+        require(waterLogs.map { it.id }.distinct().size == waterLogs.size) { "饮水记录 ID 重复" }
+        waterLogs.forEach {
+            require(it.id > 0) { "饮水记录 ID 无效" }
+            validateDate(it.date, "饮水记录")
+            require(Hydration.isValidAmount(it.amountMl)) { "饮水记录数值无效" }
         }
     }
 

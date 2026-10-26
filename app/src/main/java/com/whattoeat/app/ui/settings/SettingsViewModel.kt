@@ -133,7 +133,7 @@ class SettingsViewModel(
             backupBusy.value = true
             backupMessage.value = runCatching { backupManager.importFrom(uri) }
                 .fold(
-                    onSuccess = { "导入完成，档案、食物模板、饮食和体重记录已恢复" },
+                    onSuccess = { "导入完成，档案、食物模板、饮食、体重和饮水记录已恢复" },
                     onFailure = { "导入失败，原有数据未改变：${it.readableMessage()}" },
                 )
             backupBusy.value = false

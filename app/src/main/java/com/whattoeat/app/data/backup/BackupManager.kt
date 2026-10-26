@@ -19,7 +19,7 @@ class BackupManager(
 ) {
     suspend fun exportTo(uri: Uri) = withContext(Dispatchers.IO) {
         initialization.await()
-        // 先完整读完四张表，再开始写用户选择的文件，避免查询失败留下空备份。
+        // 先完整读完五张表，再开始写用户选择的文件，避免查询失败留下空备份。
         val data = db.withTransaction {
             BackupData(
                 appVersion = BuildConfig.VERSION_NAME,
@@ -28,6 +28,7 @@ class BackupManager(
                 foods = db.foodDao().snapshot(),
                 entries = db.logDao().snapshot(),
                 weights = db.weightDao().snapshot(),
+                waterLogs = db.waterDao().snapshot(),
             )
         }
         val stream = contentResolver.openOutputStream(uri, "wt")
@@ -46,12 +47,14 @@ class BackupManager(
             // 明确采用整包恢复，避免不同备份按名称合并产生重复或不一致。
             db.logDao().deleteAll()
             db.weightDao().deleteAll()
+            db.waterDao().deleteAll()
             db.foodDao().deleteAll()
             db.profileDao().deleteAll()
 
             db.foodDao().insertAll(data.foods)
             db.logDao().insertAll(data.entries)
             data.weights.forEach { db.weightDao().upsert(it) }
+            db.waterDao().insertAll(data.waterLogs)
             db.profileDao().upsert(data.profile)
         }
     }

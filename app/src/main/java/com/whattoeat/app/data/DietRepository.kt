@@ -5,10 +5,12 @@ import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.data.db.LogEntryEntity
 import com.whattoeat.app.data.db.UserProfileEntity
 import com.whattoeat.app.data.db.WeightLogEntity
+import com.whattoeat.app.data.db.WaterLogEntity
 import com.whattoeat.app.data.seed.FoodSeed
 import androidx.room.withTransaction
 import com.whattoeat.app.domain.ActivityLevel
 import com.whattoeat.app.domain.Goal
+import com.whattoeat.app.domain.Hydration
 import com.whattoeat.app.domain.MealType
 import com.whattoeat.app.domain.Nutrients
 import com.whattoeat.app.domain.Sex
@@ -96,6 +98,36 @@ class DietRepository(
     fun entriesOf(date: LocalDate): Flow<List<LogEntryEntity>> =
         db.logDao().byDate(date.toString())
             .shareIn(scope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
+    fun waterOf(date: LocalDate): Flow<List<WaterLogEntity>> =
+        db.waterDao().byDate(date.toString())
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
+    fun waterBetween(from: LocalDate, to: LocalDate): Flow<List<WaterLogEntity>> =
+        db.waterDao().between(from.toString(), to.toString())
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
+    suspend fun addWater(date: LocalDate, amountMl: Int) = withContext(Dispatchers.IO) {
+        require(Hydration.isValidAmount(amountMl)) { "单次饮水量需在 1 到 2000 ml 之间" }
+        db.waterDao().insert(WaterLogEntity(date = date.toString(), amountMl = amountMl))
+    }
+
+    suspend fun saveWaterGoal(goalMl: Int) = withContext(Dispatchers.IO) {
+        require(Hydration.isValidGoal(goalMl)) { "每日饮水目标需在 250 到 10000 ml 之间" }
+        db.profileDao().get()?.let { db.profileDao().upsert(it.copy(waterGoalMl = goalMl)) }
+    }
+
+    /** 只撤销调用时那一天的最后一次饮水，避免跨日期误删。 */
+    suspend fun undoLastWater(date: LocalDate) = withContext(Dispatchers.IO) {
+        val dateString = date.toString()
+        db.waterDao().latestOfDate(dateString)?.let {
+            db.waterDao().deleteByIdAndDate(it.id, dateString)
+        }
+    }
+
+    suspend fun clearWater(date: LocalDate) = withContext(Dispatchers.IO) {
+        db.waterDao().deleteByDate(date.toString())
+    }
 
     // ==================== 搜索 ====================
 
@@ -275,6 +307,7 @@ fun UserProfileEntity.toDomain(): UserProfile = UserProfile(
     goal = enumOrDefault(goal, Goal.MAINTAIN),
     manualTdeeKcal = manualTdeeKcal,
     customDeltaKcal = customDeltaKcal,
+    waterGoalMl = waterGoalMl,
 )
 
 fun UserProfile.toEntity(): UserProfileEntity = UserProfileEntity(
@@ -286,6 +319,7 @@ fun UserProfile.toEntity(): UserProfileEntity = UserProfileEntity(
     goal = goal.name,
     manualTdeeKcal = manualTdeeKcal,
     customDeltaKcal = customDeltaKcal,
+    waterGoalMl = waterGoalMl,
 )
 
 /** 字符串解析失败时回退到默认值，避免数据库脏数据把 App 搞崩 */

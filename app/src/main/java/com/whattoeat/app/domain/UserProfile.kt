@@ -52,6 +52,8 @@ data class UserProfile(
      * 它会覆盖掉所选目标的预设差值。
      */
     val customDeltaKcal: Double? = null,
+    /** 每日饮水目标（毫升），可在设置页调整。 */
+    val waterGoalMl: Int = Hydration.DEFAULT_GOAL_ML,
 ) {
     val age: Int get() = (LocalDate.now().year - birthYear).coerceAtLeast(1)
 

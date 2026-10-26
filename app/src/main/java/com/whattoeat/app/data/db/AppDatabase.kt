@@ -15,6 +15,7 @@ import com.whattoeat.app.data.seed.FoodSeed
  *  - v1：初始版本
  *  - v2：营养素新增「膳食纤维」（foods.fiberPer100g / log_entries.fiberG），
  *        档案新增「自定义每日热量差」（user_profile.customDeltaKcal）
+ *  - v3：新增按日饮水记录和每日饮水目标。
  *
  * ⚠️ 改实体字段 → version + 1，并在 [ALL_MIGRATIONS] 里补一条 Migration。
  * 下面的 v1→v2 就是范例：老用户的饮食记录不会丢，旧记录纤维先按 0 计。
@@ -24,9 +25,10 @@ import com.whattoeat.app.data.seed.FoodSeed
         FoodEntity::class,
         LogEntryEntity::class,
         WeightLogEntity::class,
+        WaterLogEntity::class,
         UserProfileEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
     abstract fun logDao(): LogDao
     abstract fun weightDao(): WeightDao
+    abstract fun waterDao(): WaterDao
     abstract fun profileDao(): ProfileDao
 
     companion object {
@@ -66,7 +69,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS water_logs (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "date TEXT NOT NULL, amountMl INTEGER NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_water_logs_date ON water_logs(date)")
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN waterGoalMl INTEGER NOT NULL DEFAULT 2000")
+            }
+        }
+
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         @Volatile
         private var instance: AppDatabase? = null

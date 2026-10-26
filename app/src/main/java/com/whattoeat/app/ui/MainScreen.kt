@@ -177,6 +177,9 @@ fun MainScreen(
                     },
                     onSaveWeight = diaryViewModel::saveWeight,
                     onClearWeight = diaryViewModel::clearWeight,
+                    onAddWater = diaryViewModel::addWater,
+                    onUndoWater = diaryViewModel::undoWater,
+                    onClearWater = diaryViewModel::clearWater,
                     contentPadding = PaddingValues(bottom = listBottomPadding),
                 )
 

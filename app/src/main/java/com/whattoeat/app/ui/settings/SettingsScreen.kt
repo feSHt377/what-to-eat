@@ -237,7 +237,7 @@ fun SettingsScreen(
             onDismissRequest = { pendingImportUri = null },
             title = { Text("确认导入并覆盖？") },
             text = {
-                Text("导入会完整替换当前档案、食物模板、饮食和体重记录，且无法撤销。\n\n建议先导出当前数据作为备份。ZIP 校验失败时不会改变现有数据。")
+                Text("导入会完整替换当前档案、食物模板、饮食、体重和饮水记录，且无法撤销。\n\n建议先导出当前数据作为备份。ZIP 校验失败时不会改变现有数据。")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -276,7 +276,7 @@ private fun BackupCard(
         Text("数据备份", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
         Text(
-            "导出为一个 ZIP 文件，包含个人配置、食物模板、饮食和体重记录。导入会覆盖当前数据。",
+            "导出为一个 ZIP 文件，包含个人配置、食物模板、饮食、体重和饮水记录。导入会覆盖当前数据。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -390,6 +390,9 @@ private fun ProfileCard(
     var weightText by remember(profile) { mutableStateOf(profile.weightKg.fmt1()) }
     var yearText by remember(profile) { mutableStateOf(profile.birthYear.toString()) }
     var tdeeText by remember(profile) { mutableStateOf(profile.manualTdeeKcal?.fmt0() ?: "") }
+    var waterGoalText by remember(profile) { mutableStateOf(profile.waterGoalMl.toString()) }
+    val waterGoalValid = waterGoalText.toIntOrNull()
+        ?.let(com.whattoeat.app.domain.Hydration::isValidGoal) == true
     // 自定义热量差：留空 = 用所选目标的预设值
     var deltaText by remember(profile) { mutableStateOf(profile.customDeltaKcal?.fmt0() ?: "") }
 
@@ -562,6 +565,26 @@ private fun ProfileCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        // ---- 饮水目标 ----
+        Spacer(Modifier.height(12.dp))
+        Text("每日饮水目标", style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value = waterGoalText,
+            onValueChange = { waterGoalText = it.filter(Char::isDigit).take(5) },
+            label = { Text("饮水目标 ml") },
+            placeholder = { Text("例如 2000") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            isError = !waterGoalValid,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "默认 2000 ml，可设置 250–10000 ml；在「今日」页记录每次喝水。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         // ---- 保存 ----
         Spacer(Modifier.height(16.dp))
         Button(
@@ -576,10 +599,14 @@ private fun ProfileCard(
                         birthYear = yearText.toIntOrNull() ?: profile.birthYear,
                         manualTdeeKcal = tdeeText.toDoubleOrNull()?.takeIf { it > 0 },
                         customDeltaKcal = deltaText.trim().toDoubleOrNull(),
+                        waterGoalMl = waterGoalText.toIntOrNull()
+                            ?.takeIf(com.whattoeat.app.domain.Hydration::isValidGoal)
+                            ?: profile.waterGoalMl,
                     )
                 )
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = waterGoalValid,
         ) { Text("保存档案") }
     }
 }

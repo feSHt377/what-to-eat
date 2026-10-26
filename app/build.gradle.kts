@@ -27,9 +27,9 @@ android {
         // 否则要额外开 coreLibraryDesugaring。Android 8.0 已覆盖绝大多数设备。
         minSdk = 26
         targetSdk = 36
-        // 与 GitHub Release 的 tag 保持一致：v0.4.0 → versionName 0.4.0
-        versionCode = 4
-        versionName = "0.4.0"
+        // 与 GitHub Release 的 tag 保持一致：v0.5.0 → versionName 0.5.0
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     signingConfigs {

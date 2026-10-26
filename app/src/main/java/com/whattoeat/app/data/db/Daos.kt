@@ -93,6 +93,37 @@ interface WeightDao {
 }
 
 @Dao
+interface WaterDao {
+
+    @Query("SELECT * FROM water_logs WHERE date = :date ORDER BY createdAt ASC, id ASC")
+    fun byDate(date: String): Flow<List<WaterLogEntity>>
+
+    @Query("SELECT * FROM water_logs WHERE date BETWEEN :fromDate AND :toDate ORDER BY date ASC, id ASC")
+    fun between(fromDate: String, toDate: String): Flow<List<WaterLogEntity>>
+
+    @Query("SELECT * FROM water_logs ORDER BY id ASC")
+    suspend fun snapshot(): List<WaterLogEntity>
+
+    @Insert
+    suspend fun insert(log: WaterLogEntity): Long
+
+    @Insert
+    suspend fun insertAll(logs: List<WaterLogEntity>)
+
+    @Query("SELECT * FROM water_logs WHERE date = :date ORDER BY createdAt DESC, id DESC LIMIT 1")
+    suspend fun latestOfDate(date: String): WaterLogEntity?
+
+    @Query("DELETE FROM water_logs WHERE id = :id AND date = :date")
+    suspend fun deleteByIdAndDate(id: Long, date: String)
+
+    @Query("DELETE FROM water_logs WHERE date = :date")
+    suspend fun deleteByDate(date: String)
+
+    @Query("DELETE FROM water_logs")
+    suspend fun deleteAll()
+}
+
+@Dao
 interface ProfileDao {
 
     @Query("SELECT * FROM user_profile WHERE id = 1")
