@@ -25,9 +25,9 @@
 - 汇总最近 7 / 14 / 30 天：有记录天的日均摄入、达标天数、累计热量差和体重变化
 - **辅助功能**：可记录体重，用长期摄入和体重趋势反推 TDEE，校准每日目标；也可以手动填写 TDEE
 - ZIP 备份：一键导出或导入档案、食物模板、饮食与体重记录
-- 自动检查 GitHub Releases，有新版本时跳转发布页下载
+- 自动检查 GitHub Releases，有新版本时在应用内下载 APK，完成后自动调起系统安装界面
 
-饮食数据只存在本机 SQLite，**不需要账号**。仅更新检查会访问公开 GitHub API，不上传饮食数据。当前版本 v0.3.0。
+饮食数据只存在本机 SQLite，**不需要账号**。仅更新检查和 APK 下载会访问公开 GitHub，不上传饮食数据。当前版本 v0.4.0。
 
 ---
 
@@ -88,7 +88,8 @@ TDEE = 平均日摄入 − (kg/天 × 7700)
 - 设置页通过系统文件选择器导出 ZIP，不需要存储权限。ZIP 包含 `manifest.json` 与版本化的 `data.json`，完整保存四张数据表。
 - 导入先读取并校验整个 ZIP，再在 Room 事务内替换数据；校验或写入失败会保留原数据。恢复会覆盖当前数据，操作前有确认提示。
 - 备份格式版本独立于 Room 版本。新增备份字段使用默认值以兼容旧备份；Room 表结构变化仍必须新增 `Migration`，不能清库代替迁移。
-- 更新检查使用公开仓库的 `releases/latest` API，仅在发现更高版本时打开对应 Release。不会自动下载、安装，也不内置 GitHub Token。
+- 更新检查使用公开仓库的 `releases/latest` API，仅在发现更高版本时下载其中的 APK 附件。下载完成后自动调起系统安装界面，由用户确认安装，不内置 GitHub Token。
+- 首次更新可能需要用户允许 WhatToEat 安装未知来源应用；授权返回后继续安装。APK 下载到应用私有目录，通过 `FileProvider` 共享给系统安装器，不需要存储权限。
 
 ### CI 与发布
 
@@ -97,8 +98,8 @@ TDEE = 平均日摄入 − (kg/天 × 7700)
 发布新版本时，先更新 `app/build.gradle.kts` 中的 `versionCode` 与 `versionName`，再推送匹配的版本标签：
 
 ```bat
-git tag -a v0.3.0 -m "WhatToEat v0.3.0"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "WhatToEat v0.4.0"
+git push origin v0.4.0
 ```
 
 标签构建成功后会自动创建 GitHub Release、生成发布说明并上传签名的 Release APK。CI 会校验签名，并直接发布构建阶段上传的同一个 APK，不重新生成密钥或重新打包。

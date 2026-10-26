@@ -1,6 +1,12 @@
 package com.whattoeat.app.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +23,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.whattoeat.app.data.DietRepository
@@ -33,6 +41,7 @@ import com.whattoeat.app.ui.diary.DiaryScreen
 import com.whattoeat.app.ui.diary.DiaryViewModel
 import com.whattoeat.app.ui.settings.SettingsScreen
 import com.whattoeat.app.ui.settings.SettingsViewModel
+import com.whattoeat.app.ui.settings.UpdateStatus
 import com.whattoeat.app.ui.summary.SummaryScreen
 import com.whattoeat.app.ui.summary.SummaryViewModel
 
@@ -61,6 +70,31 @@ fun MainScreen(
     val diaryState by diaryViewModel.uiState.collectAsStateWithLifecycle()
     val summaryState by summaryViewModel.uiState.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+    val updateStatus by settingsViewModel.updateStatus.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { settingsViewModel.resumeUpdateInstallation() }
+
+    // 在主界面处理，而不是只在设置 Tab 中处理：下载完成即自动调起安装。
+    LaunchedEffect(updateStatus) {
+        when (updateStatus) {
+            is UpdateStatus.ReadyToInstall -> settingsViewModel.resumeUpdateInstallation()
+            is UpdateStatus.InstallPermissionRequired -> {
+                try {
+                    installPermissionLauncher.launch(
+                        Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:${context.packageName}"),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    settingsViewModel.onUnknownAppSourcesUnavailable()
+                }
+            }
+            else -> Unit
+        }
+    }
 
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showAddScreen by remember { mutableStateOf(false) }

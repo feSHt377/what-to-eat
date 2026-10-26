@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
                             container.repository,
                             container.backupManager,
                             container.releaseChecker,
+                            container.appUpdateManager,
                         ),
                     )
 

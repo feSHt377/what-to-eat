@@ -5,6 +5,7 @@ import android.content.Context
 import com.whattoeat.app.data.DietRepository
 import com.whattoeat.app.data.backup.BackupManager
 import com.whattoeat.app.data.db.AppDatabase
+import com.whattoeat.app.data.update.AppUpdateManager
 import com.whattoeat.app.data.update.ReleaseChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ class AppContainer(context: Context) {
         initialization,
     )
     val releaseChecker: ReleaseChecker = ReleaseChecker()
+    val appUpdateManager: AppUpdateManager = AppUpdateManager(context)
 }
 
 class WhatToEatApp : Application() {

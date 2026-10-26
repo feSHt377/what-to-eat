@@ -8,13 +8,27 @@ import java.net.HttpURLConnection
 import java.net.URI
 
 @Serializable
+data class GitHubAsset(
+    val name: String,
+    val browser_download_url: String,
+)
+
+@Serializable
 data class GitHubRelease(
     val tag_name: String,
     val html_url: String,
     val name: String? = null,
     val draft: Boolean = false,
     val prerelease: Boolean = false,
-)
+    val assets: List<GitHubAsset> = emptyList(),
+) {
+    /** 只允许 HTTPS 的 .apk 发布附件，避免把网页或其他文件交给系统安装器。 */
+    fun apkAsset(): GitHubAsset? = assets.firstOrNull { asset ->
+        asset.name.endsWith(".apk", ignoreCase = true) &&
+            asset.browser_download_url.startsWith("https://", ignoreCase = true) &&
+            runCatching { URI(asset.browser_download_url).toURL().protocol == "https" }.getOrDefault(false)
+    }
+}
 
 /** 公开仓库的 Release 检查。无需登录，也不在客户端保存访问令牌。 */
 class ReleaseChecker(

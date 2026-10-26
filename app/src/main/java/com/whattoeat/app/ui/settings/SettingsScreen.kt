@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -90,7 +91,6 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> pendingImportUri = uri }
-
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = contentPadding,
@@ -322,18 +322,44 @@ private fun UpdateCard(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onOpenRelease(status.url) }) { Text("前往 GitHub Release") }
+                Text("即将开始下载", style = MaterialTheme.typography.bodySmall)
             }
+            is UpdateStatus.Downloading -> {
+                Text("正在下载新版本 ${status.version}…", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                status.progress?.let { progress ->
+                    LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                    Text("已下载 $progress%", style = MaterialTheme.typography.labelSmall)
+                } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text("下载完成后会自动打开系统安装界面。", style = MaterialTheme.typography.labelSmall)
+            }
+            is UpdateStatus.ReadyToInstall -> Text(
+                "安装包已下载，正在打开系统安装界面…",
+                color = NutrientColors.Fiber,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            is UpdateStatus.InstallPermissionRequired -> Text(
+                "请在系统设置中允许 WhatToEat 安装未知来源应用，返回后会继续安装。",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            UpdateStatus.Installing -> Text(
+                "安装界面已打开，请按系统提示确认安装。",
+                color = NutrientColors.Fiber,
+                style = MaterialTheme.typography.bodySmall,
+            )
             is UpdateStatus.Error -> Text(
-                "检查失败：${status.message}",
+                status.message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onCheck, enabled = status !is UpdateStatus.Checking) {
+            OutlinedButton(
+                onClick = onCheck,
+                enabled = status !is UpdateStatus.Checking && status !is UpdateStatus.Downloading,
+            ) {
                 Text("重新检查")
             }
             TextButton(onClick = { onOpenRelease(ReleaseChecker.RELEASES_URL) }) {
@@ -341,7 +367,7 @@ private fun UpdateCard(
             }
         }
         Text(
-            "仅检查公开 GitHub Release，不自动下载或安装。更新检查需要联网；饮食数据不上传。",
+            "更新包从公开 GitHub Release 下载，完成后调起系统安装界面；是否安装由你确认。饮食数据不上传。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -9,12 +9,15 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.whattoeat.app.BuildConfig
 import com.whattoeat.app.data.DietRepository
 import com.whattoeat.app.data.backup.BackupManager
+import com.whattoeat.app.data.update.AppUpdateManager
+import com.whattoeat.app.data.update.GitHubAsset
 import com.whattoeat.app.data.update.ReleaseChecker
 import com.whattoeat.app.data.update.VersionComparator
 import com.whattoeat.app.data.db.FoodEntity
 import com.whattoeat.app.domain.TdeeEstimate
 import com.whattoeat.app.domain.TdeeEstimator
 import com.whattoeat.app.domain.UserProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.time.LocalDate
 
 data class SettingsUiState(
@@ -37,7 +41,11 @@ sealed interface UpdateStatus {
     data object Idle : UpdateStatus
     data object Checking : UpdateStatus
     data object Current : UpdateStatus
-    data class Available(val version: String, val url: String) : UpdateStatus
+    data class Available(val version: String, val asset: GitHubAsset) : UpdateStatus
+    data class Downloading(val version: String, val progress: Int?) : UpdateStatus
+    data class ReadyToInstall(val version: String) : UpdateStatus
+    data class InstallPermissionRequired(val version: String) : UpdateStatus
+    data object Installing : UpdateStatus
     data class Error(val message: String) : UpdateStatus
 }
 
@@ -48,6 +56,7 @@ class SettingsViewModel(
     private val repository: DietRepository,
     private val backupManager: BackupManager,
     private val releaseChecker: ReleaseChecker,
+    private val appUpdateManager: AppUpdateManager,
 ) : ViewModel() {
 
     private val today = LocalDate.now()
@@ -131,6 +140,56 @@ class SettingsViewModel(
         }
     }
 
+    private fun downloadUpdate(available: UpdateStatus.Available) {
+        updateStatus.value = UpdateStatus.Downloading(available.version, null)
+        runCatching {
+            appUpdateManager.downloadApk(available.asset) { progress ->
+                updateStatus.value = UpdateStatus.Downloading(available.version, progress)
+            }
+        }.onSuccess {
+            updateStatus.value = UpdateStatus.ReadyToInstall(available.version)
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            updateStatus.value = UpdateStatus.Error("更新失败：${error.readableMessage()}")
+        }
+    }
+
+    /** 安装界面已经调起，避免页面重组或切回设置页时重复弹出。 */
+    fun onInstallationLaunched() {
+        updateStatus.value = UpdateStatus.Installing
+    }
+
+    fun resumeUpdateInstallation() {
+        if (updateStatus.value !is UpdateStatus.ReadyToInstall &&
+            updateStatus.value !is UpdateStatus.InstallPermissionRequired
+        ) return
+        runCatching { appUpdateManager.installDownloadedApk() }
+            .onSuccess { onInstallationLaunched() }
+            .onFailure { error ->
+                if (error is AppUpdateManager.InstallPermissionRequiredException) {
+                    onUpdatePermissionRequired()
+                } else {
+                    updateStatus.value = UpdateStatus.Error("无法安装更新：${error.readableMessage()}")
+                }
+            }
+    }
+
+    fun onUpdatePermissionRequired() {
+        val status = updateStatus.value
+        val version = when (status) {
+            is UpdateStatus.ReadyToInstall -> status.version
+            is UpdateStatus.InstallPermissionRequired -> status.version
+            else -> null
+        } ?: return
+        updateStatus.value = UpdateStatus.InstallPermissionRequired(version)
+    }
+
+    fun onUnknownAppSourcesUnavailable() {
+        if (updateStatus.value is UpdateStatus.InstallPermissionRequired) {
+            updateStatus.value = UpdateStatus.Error("系统未提供安装权限设置，请手动允许安装未知来源应用后重试")
+        }
+    }
+
     fun clearBackupMessage() {
         backupMessage.value = null
     }
@@ -143,13 +202,17 @@ class SettingsViewModel(
                 .fold(
                     onSuccess = { release ->
                         if (VersionComparator.compare(release.tag_name, BuildConfig.VERSION_NAME) > 0) {
-                            UpdateStatus.Available(release.tag_name, release.html_url)
+                            val apk = release.apkAsset()
+                                ?: throw IOException("最新 Release 没有可下载的 APK 附件")
+                            UpdateStatus.Available(release.tag_name, apk)
                         } else {
                             UpdateStatus.Current
                         }
                     },
                     onFailure = { UpdateStatus.Error(it.readableMessage()) },
                 )
+            // 在同一个更新任务里直接下载，避免两个任务的启停状态互相竞争。
+            (updateStatus.value as? UpdateStatus.Available)?.let(::downloadUpdate)
         }
     }
 
@@ -161,8 +224,9 @@ class SettingsViewModel(
             repository: DietRepository,
             backupManager: BackupManager,
             releaseChecker: ReleaseChecker,
+            appUpdateManager: AppUpdateManager,
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { SettingsViewModel(repository, backupManager, releaseChecker) }
+            initializer { SettingsViewModel(repository, backupManager, releaseChecker, appUpdateManager) }
         }
     }
 }
